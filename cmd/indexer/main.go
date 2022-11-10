@@ -6,13 +6,10 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
+	"foxyshot-indexer/internal/s3wrapper"
+
 	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
 	_ "github.com/jackc/pgx/stdlib"
@@ -60,13 +57,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	client := NewS3Client(cfg.S3)
-
-	fp := &FilesProvider{
-		client:     client,
-		publicAddr: cfg.S3.PublicAddr,
-		suffix:     cfg.Ext,
-		bucket:     cfg.S3.Bucket,
+	storage, err := s3wrapper.NewFromSecrets(cfg.S3.Key, cfg.S3.Secret, cfg.S3.Endpoint, cfg.S3.Region, cfg.S3.Bucket)
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	db, err := sqlx.Connect("pgx", cfg.DSN)
@@ -74,9 +67,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	i := Indexer{db: db}
+	i := Indexer{db: db, storage: storage}
 
-	files, err := fp.GetFiles(time.Unix(0, 0))
+	files, err := storage.ListFiles(time.Unix(0, 0), cfg.Ext)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -84,7 +77,7 @@ func main() {
 	for _, file := range files {
 		err := i.Index(file)
 		if err != nil {
-			log.Println("failed to index:", err)
+			log.Println("ERROR: failed to index:", err)
 		} else {
 			log.Println("added", file)
 		}
@@ -97,40 +90,25 @@ func validateConfig(cfg Config) error {
 	return validate.Struct(cfg)
 }
 
-type FilesProvider struct {
-	client     *s3.S3
-	publicAddr string
-	suffix     string
-	bucket     string
-}
-
-func (f *FilesProvider) GetFiles(start time.Time) ([]string, error) {
-	listObjsResponse, err := f.client.ListObjectsV2(&s3.ListObjectsV2Input{Bucket: aws.String(f.bucket)})
-	if err != nil {
-		return nil, fmt.Errorf("listing objects from bucket %s, %w", f.bucket, err)
-	}
-
-	var files []string
-	for _, object := range listObjsResponse.Contents {
-		if object.LastModified.Before(start) {
-			continue
-		}
-		if !strings.HasSuffix(*object.Key, f.suffix) {
-			continue
-		}
-
-		files = append(files, f.publicAddr+"/"+*object.Key)
-	}
-
-	return files, nil
-}
-
 type Indexer struct {
-	db *sqlx.DB
+	db      *sqlx.DB
+	storage *s3wrapper.BucketClient
 }
 
 func (i *Indexer) Index(file string) error {
-	ocr, err := RunOCR(file)
+	f, err := i.storage.Download(file)
+	if f != nil {
+		defer func(name string) {
+			err := os.Remove(name)
+			if err != nil {
+				log.Println("ERROR: removing temp file,", err)
+			}
+		}(f.Name())
+	}
+	if err != nil {
+		return fmt.Errorf("cannot download file, %w")
+	}
+	ocr, err := RunOCR(f.Name())
 	if err != nil {
 		return fmt.Errorf("running ocr, %w", err)
 	}
@@ -173,21 +151,4 @@ func RunOCR(file string) (string, error) {
 	}
 
 	return string(contents), nil
-}
-
-func NewS3Client(config S3Config) *s3.S3 {
-	s3Config := &aws.Config{
-		S3ForcePathStyle: aws.Bool(true),
-		Credentials:      credentials.NewStaticCredentials(config.Key, config.Secret, ""),
-		Endpoint:         aws.String(config.Endpoint),
-		Region:           aws.String(config.Region),
-	}
-
-	newSession, err := session.NewSession(s3Config)
-	if err != nil {
-		log.Fatalf("Cannot connect to storage, got %v", err)
-	}
-	s3Client := s3.New(newSession)
-
-	return s3Client
 }
