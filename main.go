@@ -45,14 +45,14 @@ func main() {
 
 	flag.StringVar(&cfg.ImgDir, "dir", "imgdata", "path to the folder with the images")
 	flag.StringVar(&cfg.Ext, "ext", ".jpg", "file extensions to use")
-	flag.StringVar(&cfg.DSN, "dsn", "", "path to the folder with the images")
+	flag.StringVar(&cfg.DSN, "dsn", os.Getenv("DB_DSN"), "connection string for the database")
 
-	flag.StringVar(&cfg.S3.Key, "s3.key", "", "s3 key")
-	flag.StringVar(&cfg.S3.Secret, "s3.secret", "", "s3 secret")
-	flag.StringVar(&cfg.S3.Endpoint, "s3.endpoint", "", "s3 endpoint")
+	flag.StringVar(&cfg.S3.Key, "s3.key", os.Getenv("S3_KEY"), "s3 key")
+	flag.StringVar(&cfg.S3.Secret, "s3.secret", os.Getenv("S3_SECRET"), "s3 secret")
+	flag.StringVar(&cfg.S3.Endpoint, "s3.endpoint", os.Getenv("S3_ENDPOINT"), "s3 endpoint")
 	flag.StringVar(&cfg.S3.Region, "s3.region", "eu-west1", "s3 region")
-	flag.StringVar(&cfg.S3.Bucket, "s3.bucket", "", "s3 bucket")
-	flag.StringVar(&cfg.S3.PublicAddr, "s3.public", "", "public address to which images will be attached")
+	flag.StringVar(&cfg.S3.Bucket, "s3.bucket", os.Getenv("S3_BUCKET"), "s3 bucket")
+	flag.StringVar(&cfg.S3.PublicAddr, "s3.public", os.Getenv("S3_PUBLIC"), "public address to which images will be attached")
 	flag.Parse()
 
 	err := validateConfig(cfg)

@@ -1,0 +1,28 @@
+version: "3.9"
+services:
+  app:
+    build:
+      context: .
+    environment:
+      - S3_ENDPOINT
+      - S3_KEY
+      - S3_SECRET
+      - S3_BUCKET
+      - S3_PUBLIC
+      - DB_DSN=postgres://$DBUSER:$DBPASS@db/$DBNAME
+    volumes:
+      - .:/app
+  db:
+    image: postgres:15
+    restart: always
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_PASSWORD: $DBPASS
+      POSTGRES_USER: $DBUSER
+      POSTGRES_DB: $DBNAME
+volumes:
+  db-data:
+    driver: local

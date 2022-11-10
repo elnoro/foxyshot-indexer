@@ -1,12 +1,11 @@
-FROM golang:1.19-alpine AS build
+FROM golang:1.19-alpine
+
+RUN apk update && apk add tesseract-ocr
+RUN go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@v4.15.2
 
 WORKDIR /go/src/indexer
 COPY . .
 RUN CGO_ENABLED=0 go build -o /app/indexer
+WORKDIR /app
 
-FROM ubuntu:22.10
-
-RUN apt update && apt install -y tesseract-ocr
-COPY --from=build /app /
-
-ENTRYPOINT "/indexer -dsn=$DSN -s3.key=$S3_KEY -s3.secret=$S3_SECRET -s3.bucket=$BUCKET -s3.endpoint=$S3_ENDPOINT -s3.public=$S3_PUBLIC"
+ENTRYPOINT ["sleep", "600"]
