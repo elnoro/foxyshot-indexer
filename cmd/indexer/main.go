@@ -5,6 +5,7 @@ import (
 	"flag"
 	"log"
 	"os"
+	"time"
 
 	dbadapter "github.com/elnoro/foxyshot-indexer/internal/db"
 	"github.com/elnoro/foxyshot-indexer/internal/indexer"
@@ -17,10 +18,10 @@ import (
 )
 
 type Config struct {
-	ImgDir string
-	Ext    string
-	DSN    string `validate:"required"`
-	S3     S3Config
+	ScrapeInterval string   `validate:"required"`
+	Ext            string   `validate:"required"`
+	DSN            string   `validate:"required"`
+	S3             S3Config `validate:"required"`
 }
 
 type S3Config struct {
@@ -35,7 +36,7 @@ type S3Config struct {
 func main() {
 	cfg := Config{}
 
-	flag.StringVar(&cfg.ImgDir, "dir", "imgdata", "path to the folder with the images")
+	flag.StringVar(&cfg.ScrapeInterval, "scrape.interval", "15m", "how often to scrape s3")
 	flag.StringVar(&cfg.Ext, "ext", ".jpg", "file extensions to use")
 	flag.StringVar(&cfg.DSN, "dsn", os.Getenv("DB_DSN"), "connection string for the database")
 
@@ -48,6 +49,11 @@ func main() {
 	flag.Parse()
 
 	err := validateConfig(cfg)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	duration, err := time.ParseDuration(cfg.ScrapeInterval)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -71,25 +77,28 @@ func main() {
 
 	i := indexer.NewIndexer(imgRepo, storage, ocrEngine)
 
-	// this code reprocesses the last processed image right now - this is intentional
-	// to prevent losing images from the same last modified timestamps
-	lastModified, err := imgRepo.GetLastModified(context.Background())
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	files, err := storage.ListFiles(lastModified, cfg.Ext)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	for _, file := range files {
-		err := i.Index(file)
+	for {
+		// this code reprocesses the last processed image right now - this is intentional
+		// to prevent losing images from the same last modified timestamps
+		lastModified, err := imgRepo.GetLastModified(context.Background())
 		if err != nil {
-			log.Println("ERROR: failed to index:", err)
-		} else {
-			log.Println("added", file)
+			log.Fatal(err) // if there is something wrong with the db we fail the app and let a supervisor restart it
 		}
+		files, err := storage.ListFiles(lastModified, cfg.Ext)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		for _, file := range files {
+			err := i.Index(file)
+			if err != nil {
+				log.Println("ERROR: failed to index:", err)
+			} else {
+				log.Println("added", file)
+			}
+		}
+
+		time.Sleep(duration)
 	}
 }
 
