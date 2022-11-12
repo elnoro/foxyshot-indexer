@@ -4,6 +4,7 @@
 package indexer
 
 import (
+	"context"
 	"github.com/elnoro/foxyshot-indexer/internal/domain"
 	"os"
 	"sync"
@@ -44,7 +45,7 @@ type ImageRepoMock struct {
 }
 
 // Upsert calls UpsertFunc.
-func (mock *ImageRepoMock) Upsert(image domain.Image) error {
+func (mock *ImageRepoMock) Upsert(ctx context.Context, image domain.Image) error {
 	if mock.UpsertFunc == nil {
 		panic("ImageRepoMock.UpsertFunc: method is nil but ImageRepo.Upsert was just called")
 	}

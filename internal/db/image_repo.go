@@ -19,12 +19,12 @@ func NewImageRepo(db *sqlx.DB) *ImageRepo {
 	return &ImageRepo{db: db}
 }
 
-func (i *ImageRepo) Upsert(image domain.Image) error {
+func (i *ImageRepo) Upsert(ctx context.Context, image domain.Image) error {
 	query := `INSERT INTO image_descriptions (file_id, description, last_modified) 
 			VALUES (:file_id, :description, :last_modified)
 			ON CONFLICT (file_id) DO UPDATE SET (description, last_modified) 
 			    = (excluded.description, excluded.last_modified)`
-	_, err := i.db.NamedExec(query, image)
+	_, err := i.db.NamedExecContext(ctx, query, image)
 	if err != nil {
 		return fmt.Errorf("inserting image id=%s, %w", image.FileID, err)
 	}
@@ -40,7 +40,7 @@ func (i *ImageRepo) GetLastModified(ctx context.Context) (time.Time, error) {
 	if err != nil {
 		switch {
 		case errors.Is(err, sql.ErrNoRows):
-			return time.Unix(0, 0), nil
+			return time.Unix(0, 0).UTC(), nil
 		default:
 			return time.Time{}, fmt.Errorf("looking for last modified, %w", err)
 		}

@@ -1,6 +1,7 @@
 package indexer
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -10,7 +11,7 @@ import (
 
 //go:generate moq -out indexer_moq_test.go . ImageRepo FileStorage OCR
 type ImageRepo interface {
-	Upsert(image domain.Image) error
+	Upsert(ctx context.Context, image domain.Image) error
 }
 
 type FileStorage interface {
@@ -55,7 +56,7 @@ func (i *Indexer) Index(file domain.File) error {
 		Description:  desc,
 	}
 
-	err = i.imageRepo.Upsert(img)
+	err = i.imageRepo.Upsert(context.TODO(), img)
 	if err != nil {
 		return fmt.Errorf("inserting image, %w", err)
 	}
