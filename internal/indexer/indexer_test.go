@@ -3,6 +3,7 @@ package indexer
 import (
 	"os"
 	"testing"
+	"time"
 
 	"github.com/elnoro/foxyshot-indexer/internal/domain"
 	"github.com/matryer/is"
@@ -12,24 +13,28 @@ import (
 func TestIndexer_Index(t *testing.T) {
 	tt := is.New(t)
 
+	testFile := domain.File{
+		Key:          "expected-image-key",
+		LastModified: time.Unix(10000, 0),
+	}
 	const testImg = "./testdata/expected-downloaded-image"
-	const testKey = "expected-image-key"
 	const testOCRResult = "expected-ocr-results"
 
-	repo := &ImageRepoMock{InsertFunc: func(image domain.Image) error { return nil }}
+	repo := &ImageRepoMock{UpsertFunc: func(image domain.Image) error { return nil }}
 	storage := &FileStorageMock{DownloadFunc: func(key string) (*os.File, error) { return os.Create(testImg) }}
 	ocr := &OCRMock{RunFunc: func(file string) (string, error) { return testOCRResult, nil }}
 
 	t.Run("successful run", func(t *testing.T) {
 		indexer := NewIndexer(repo, storage, ocr)
-		err := indexer.Index(testKey)
+		err := indexer.Index(testFile)
 		tt.NoErr(err)
 
-		tt.Equal(storage.DownloadCalls()[0].Key, testKey)
+		tt.Equal(storage.DownloadCalls()[0].Key, testFile.Key)
 		tt.Equal(ocr.RunCalls()[0].File, testImg)
-		tt.Equal(repo.InsertCalls()[0].Image, domain.Image{
-			FileID:      testKey,
-			Description: testOCRResult,
+		tt.Equal(repo.UpsertCalls()[0].Image, domain.Image{
+			FileID:       testFile.Key,
+			Description:  testOCRResult,
+			LastModified: testFile.LastModified,
 		})
 
 		_, err = os.Stat(testImg)
@@ -40,10 +45,10 @@ func TestIndexer_Index(t *testing.T) {
 
 	t.Run("repo error", func(t *testing.T) {
 		expectedErr := errors.New("expected err")
-		repo := &ImageRepoMock{InsertFunc: func(image domain.Image) error { return expectedErr }}
+		repo := &ImageRepoMock{UpsertFunc: func(image domain.Image) error { return expectedErr }}
 
 		indexer := NewIndexer(repo, storage, ocr)
-		err := indexer.Index(testKey)
+		err := indexer.Index(testFile)
 
 		tt.True(errors.Is(err, expectedErr))
 	})
@@ -53,7 +58,7 @@ func TestIndexer_Index(t *testing.T) {
 		storage := &FileStorageMock{DownloadFunc: func(key string) (*os.File, error) { return nil, expectedErr }}
 
 		indexer := NewIndexer(repo, storage, ocr)
-		err := indexer.Index(testKey)
+		err := indexer.Index(testFile)
 
 		tt.True(errors.Is(err, expectedErr))
 	})
@@ -63,7 +68,7 @@ func TestIndexer_Index(t *testing.T) {
 		ocr := &OCRMock{RunFunc: func(file string) (string, error) { return "", expectedErr }}
 
 		indexer := NewIndexer(repo, storage, ocr)
-		err := indexer.Index(testKey)
+		err := indexer.Index(testFile)
 
 		tt.True(errors.Is(err, expectedErr))
 	})
@@ -77,7 +82,7 @@ func TestIndexer_Index(t *testing.T) {
 		}}
 
 		indexer := NewIndexer(repo, storage, ocr)
-		err := indexer.Index(testKey)
+		err := indexer.Index(testFile)
 
 		tt.NoErr(err)
 	})

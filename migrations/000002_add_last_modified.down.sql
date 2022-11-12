@@ -1,0 +1,1 @@
+alter table image_descriptions drop last_modified

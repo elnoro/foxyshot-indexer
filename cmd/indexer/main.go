@@ -1,10 +1,10 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"log"
 	"os"
-	"time"
 
 	dbadapter "github.com/elnoro/foxyshot-indexer/internal/db"
 	"github.com/elnoro/foxyshot-indexer/internal/indexer"
@@ -71,7 +71,14 @@ func main() {
 
 	i := indexer.NewIndexer(imgRepo, storage, ocrEngine)
 
-	files, err := storage.ListFiles(time.Unix(0, 0), cfg.Ext)
+	// this code reprocesses the last processed image right now - this is intentional
+	// to prevent losing images from the same last modified timestamps
+	lastModified, err := imgRepo.GetLastModified(context.Background())
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	files, err := storage.ListFiles(lastModified, cfg.Ext)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -83,7 +90,6 @@ func main() {
 		} else {
 			log.Println("added", file)
 		}
-		return
 	}
 }
 

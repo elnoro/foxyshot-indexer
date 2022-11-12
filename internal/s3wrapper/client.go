@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/elnoro/foxyshot-indexer/internal/domain"
 )
 
 type BucketClient struct {
@@ -42,13 +43,13 @@ func NewFromSecrets(key, secret, endpoint, region, bucket string) (*BucketClient
 	return NewClient(s3Client, s3Downloader, bucket), nil
 }
 
-func (c *BucketClient) ListFiles(start time.Time, ext string) ([]string, error) {
+func (c *BucketClient) ListFiles(start time.Time, ext string) ([]domain.File, error) {
 	listObjsResponse, err := c.client.ListObjectsV2(&s3.ListObjectsV2Input{Bucket: aws.String(c.bucket)})
 	if err != nil {
 		return nil, fmt.Errorf("listing objects from bucket %s, %w", c.bucket, err)
 	}
 
-	var files []string
+	var files []domain.File
 	for _, object := range listObjsResponse.Contents {
 		if object.LastModified.Before(start) {
 			continue
@@ -57,7 +58,7 @@ func (c *BucketClient) ListFiles(start time.Time, ext string) ([]string, error) 
 			continue
 		}
 
-		files = append(files, *object.Key)
+		files = append(files, domain.File{Key: *object.Key, LastModified: *object.LastModified})
 	}
 
 	return files, nil

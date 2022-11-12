@@ -10,7 +10,7 @@ import (
 
 //go:generate moq -out indexer_moq_test.go . ImageRepo FileStorage OCR
 type ImageRepo interface {
-	Insert(image domain.Image) error
+	Upsert(image domain.Image) error
 }
 
 type FileStorage interface {
@@ -31,8 +31,8 @@ func NewIndexer(imageRepo ImageRepo, storage FileStorage, ocrEngine OCR) *Indexe
 	return &Indexer{imageRepo: imageRepo, storage: storage, ocrEngine: ocrEngine}
 }
 
-func (i *Indexer) Index(file string) error {
-	f, err := i.storage.Download(file)
+func (i *Indexer) Index(file domain.File) error {
+	f, err := i.storage.Download(file.Key)
 	if f != nil {
 		defer func(name string) {
 			err := os.Remove(name)
@@ -50,11 +50,12 @@ func (i *Indexer) Index(file string) error {
 	}
 
 	img := domain.Image{
-		FileID:      file,
-		Description: desc,
+		FileID:       file.Key,
+		LastModified: file.LastModified,
+		Description:  desc,
 	}
 
-	err = i.imageRepo.Insert(img)
+	err = i.imageRepo.Upsert(img)
 	if err != nil {
 		return fmt.Errorf("inserting image, %w", err)
 	}

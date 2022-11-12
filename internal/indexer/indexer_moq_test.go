@@ -19,8 +19,8 @@ var _ ImageRepo = &ImageRepoMock{}
 //
 //		// make and configure a mocked ImageRepo
 //		mockedImageRepo := &ImageRepoMock{
-//			InsertFunc: func(image domain.Image) error {
-//				panic("mock out the Insert method")
+//			UpsertFunc: func(image domain.Image) error {
+//				panic("mock out the Upsert method")
 //			},
 //		}
 //
@@ -29,49 +29,49 @@ var _ ImageRepo = &ImageRepoMock{}
 //
 //	}
 type ImageRepoMock struct {
-	// InsertFunc mocks the Insert method.
-	InsertFunc func(image domain.Image) error
+	// UpsertFunc mocks the Upsert method.
+	UpsertFunc func(image domain.Image) error
 
 	// calls tracks calls to the methods.
 	calls struct {
-		// Insert holds details about calls to the Insert method.
-		Insert []struct {
+		// Upsert holds details about calls to the Upsert method.
+		Upsert []struct {
 			// Image is the image argument value.
 			Image domain.Image
 		}
 	}
-	lockInsert sync.RWMutex
+	lockUpsert sync.RWMutex
 }
 
-// Insert calls InsertFunc.
-func (mock *ImageRepoMock) Insert(image domain.Image) error {
-	if mock.InsertFunc == nil {
-		panic("ImageRepoMock.InsertFunc: method is nil but ImageRepo.Insert was just called")
+// Upsert calls UpsertFunc.
+func (mock *ImageRepoMock) Upsert(image domain.Image) error {
+	if mock.UpsertFunc == nil {
+		panic("ImageRepoMock.UpsertFunc: method is nil but ImageRepo.Upsert was just called")
 	}
 	callInfo := struct {
 		Image domain.Image
 	}{
 		Image: image,
 	}
-	mock.lockInsert.Lock()
-	mock.calls.Insert = append(mock.calls.Insert, callInfo)
-	mock.lockInsert.Unlock()
-	return mock.InsertFunc(image)
+	mock.lockUpsert.Lock()
+	mock.calls.Upsert = append(mock.calls.Upsert, callInfo)
+	mock.lockUpsert.Unlock()
+	return mock.UpsertFunc(image)
 }
 
-// InsertCalls gets all the calls that were made to Insert.
+// UpsertCalls gets all the calls that were made to Upsert.
 // Check the length with:
 //
-//	len(mockedImageRepo.InsertCalls())
-func (mock *ImageRepoMock) InsertCalls() []struct {
+//	len(mockedImageRepo.UpsertCalls())
+func (mock *ImageRepoMock) UpsertCalls() []struct {
 	Image domain.Image
 } {
 	var calls []struct {
 		Image domain.Image
 	}
-	mock.lockInsert.RLock()
-	calls = mock.calls.Insert
-	mock.lockInsert.RUnlock()
+	mock.lockUpsert.RLock()
+	calls = mock.calls.Upsert
+	mock.lockUpsert.RUnlock()
 	return calls
 }
 
