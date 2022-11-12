@@ -2,18 +2,18 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"log"
 	"os"
-	"os/exec"
 	"time"
 
-	"foxyshot-indexer/internal/s3wrapper"
-
+	dbadapter "github.com/elnoro/foxyshot-indexer/internal/db"
+	"github.com/elnoro/foxyshot-indexer/internal/indexer"
 	"github.com/go-playground/validator/v10"
-	"github.com/google/uuid"
 	_ "github.com/jackc/pgx/stdlib"
 	"github.com/jmoiron/sqlx"
+
+	"github.com/elnoro/foxyshot-indexer/internal/ocr"
+	"github.com/elnoro/foxyshot-indexer/internal/s3wrapper"
 )
 
 type Config struct {
@@ -30,11 +30,6 @@ type S3Config struct {
 	Region     string `validate:"required"`
 	Bucket     string `validate:"required"`
 	PublicAddr string `validate:"required"`
-}
-
-type ImageDescription struct {
-	FileID      string `db:"file_id"`
-	Description string `db:"description"`
 }
 
 func main() {
@@ -62,12 +57,19 @@ func main() {
 		log.Fatal(err)
 	}
 
+	ocrEngine, err := ocr.Default()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	db, err := sqlx.Connect("pgx", cfg.DSN)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	i := Indexer{db: db, storage: storage}
+	imgRepo := dbadapter.NewImageRepo(db)
+
+	i := indexer.NewIndexer(imgRepo, storage, ocrEngine)
 
 	files, err := storage.ListFiles(time.Unix(0, 0), cfg.Ext)
 	if err != nil {
@@ -88,67 +90,4 @@ func main() {
 func validateConfig(cfg Config) error {
 	validate := validator.New()
 	return validate.Struct(cfg)
-}
-
-type Indexer struct {
-	db      *sqlx.DB
-	storage *s3wrapper.BucketClient
-}
-
-func (i *Indexer) Index(file string) error {
-	f, err := i.storage.Download(file)
-	if f != nil {
-		defer func(name string) {
-			err := os.Remove(name)
-			if err != nil {
-				log.Println("ERROR: removing temp file,", err)
-			}
-		}(f.Name())
-	}
-	if err != nil {
-		return fmt.Errorf("cannot download file, %w")
-	}
-	ocr, err := RunOCR(f.Name())
-	if err != nil {
-		return fmt.Errorf("running ocr, %w", err)
-	}
-
-	id := &ImageDescription{
-		FileID:      file,
-		Description: ocr,
-	}
-
-	_, err = i.db.NamedExec(
-		"INSERT INTO image_descriptions (file_id, description) VALUES (:file_id, :description)", id,
-	)
-	if err != nil {
-		return fmt.Errorf("db insert %w", err)
-	}
-
-	return nil
-}
-
-func RunOCR(file string) (string, error) {
-	descFileID := uuid.New().String()
-	descFile := descFileID + ".txt"
-	defer func(name string) {
-		err := os.Remove(name)
-		if err != nil {
-			log.Println(err)
-		}
-	}(descFile)
-	cmd := exec.Command("tesseract", file, descFileID)
-
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		log.Println(string(out))
-		return "", fmt.Errorf("running tesseract, %w", err)
-	}
-
-	contents, err := os.ReadFile(descFile)
-	if err != nil {
-		return "", fmt.Errorf("reading tesseract output, %w", err)
-	}
-
-	return string(contents), nil
 }
