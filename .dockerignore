@@ -3,3 +3,4 @@
 .env
 docker-compose.yml
 .gitignore
+.DS_Store

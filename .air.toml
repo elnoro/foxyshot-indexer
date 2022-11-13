@@ -1,0 +1,7 @@
+root = "."
+
+[build]
+# Just plain old shell command. You could use `make` as well.
+cmd = "go build -o /tmp/indexer cmd/indexer/main.go"
+# Binary file yields from `cmd`.
+bin = "/tmp/indexer"

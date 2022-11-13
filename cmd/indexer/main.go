@@ -93,7 +93,7 @@ func main() {
 
 	ctx := context.Background()
 	for {
-		lastModified, err := imgRepo.GetLastModified(context.Background())
+		lastModified, err := imgRepo.GetLastModified(ctx)
 		if err != nil {
 			log.Fatal(err) // if there is something wrong with the db we fail the app and let a supervisor restart it
 		}
@@ -117,7 +117,7 @@ func main() {
 			if err != nil {
 				log.Println("ERROR: failed to index:", err)
 			} else {
-				log.Println("added", file)
+				log.Println("INFO: added", file)
 			}
 		}
 
