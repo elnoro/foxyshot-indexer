@@ -1,6 +1,7 @@
 package indexer
 
 import (
+	"context"
 	"os"
 	"testing"
 	"time"
@@ -20,7 +21,7 @@ func TestIndexer_Index(t *testing.T) {
 	const testImg = "./testdata/expected-downloaded-image"
 	const testOCRResult = "expected-ocr-results"
 
-	repo := &ImageRepoMock{UpsertFunc: func(image domain.Image) error { return nil }}
+	repo := &ImageRepoMock{UpsertFunc: func(ctx context.Context, image domain.Image) error { return nil }}
 	storage := &FileStorageMock{DownloadFunc: func(key string) (*os.File, error) { return os.Create(testImg) }}
 	ocr := &OCRMock{RunFunc: func(file string) (string, error) { return testOCRResult, nil }}
 
@@ -45,7 +46,7 @@ func TestIndexer_Index(t *testing.T) {
 
 	t.Run("repo error", func(t *testing.T) {
 		expectedErr := errors.New("expected err")
-		repo := &ImageRepoMock{UpsertFunc: func(image domain.Image) error { return expectedErr }}
+		repo := &ImageRepoMock{UpsertFunc: func(ctx context.Context, image domain.Image) error { return expectedErr }}
 
 		indexer := NewIndexer(repo, storage, ocr)
 		err := indexer.Index(testFile)

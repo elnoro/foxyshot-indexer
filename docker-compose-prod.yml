@@ -10,12 +10,9 @@ services:
       - S3_BUCKET
       - S3_PUBLIC
       - DB_DSN=postgres://$DBUSER:$DBPASS@db/$DBNAME
-      - TEST_DSN=postgres://$DBUSER:$DBPASS@db/$DBNAME
-    volumes:
-      - .:/app
+    entrypoint: [ "/indexer" ]
     depends_on:
       - db
-      - minio
   db:
     image: postgres:15
     restart: always
@@ -27,19 +24,6 @@ services:
       POSTGRES_PASSWORD: $DBPASS
       POSTGRES_USER: $DBUSER
       POSTGRES_DB: $DBNAME
-  minio:
-    image: bitnami/minio
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    volumes:
-      - minio-data:/data
-    environment:
-      - MINIO_ROOT_USER=$S3_KEY
-      - MINIO_ROOT_PASSWORD=$S3_SECRET
-      - MINIO_DEFAULT_BUCKETS=$S3_BUCKET:public
 volumes:
   db-data:
-    driver: local
-  minio-data:
     driver: local

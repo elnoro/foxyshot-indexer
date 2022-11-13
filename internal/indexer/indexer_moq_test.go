@@ -20,7 +20,7 @@ var _ ImageRepo = &ImageRepoMock{}
 //
 //		// make and configure a mocked ImageRepo
 //		mockedImageRepo := &ImageRepoMock{
-//			UpsertFunc: func(image domain.Image) error {
+//			UpsertFunc: func(ctx context.Context, image domain.Image) error {
 //				panic("mock out the Upsert method")
 //			},
 //		}
@@ -31,12 +31,14 @@ var _ ImageRepo = &ImageRepoMock{}
 //	}
 type ImageRepoMock struct {
 	// UpsertFunc mocks the Upsert method.
-	UpsertFunc func(image domain.Image) error
+	UpsertFunc func(ctx context.Context, image domain.Image) error
 
 	// calls tracks calls to the methods.
 	calls struct {
 		// Upsert holds details about calls to the Upsert method.
 		Upsert []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
 			// Image is the image argument value.
 			Image domain.Image
 		}
@@ -50,14 +52,16 @@ func (mock *ImageRepoMock) Upsert(ctx context.Context, image domain.Image) error
 		panic("ImageRepoMock.UpsertFunc: method is nil but ImageRepo.Upsert was just called")
 	}
 	callInfo := struct {
+		Ctx   context.Context
 		Image domain.Image
 	}{
+		Ctx:   ctx,
 		Image: image,
 	}
 	mock.lockUpsert.Lock()
 	mock.calls.Upsert = append(mock.calls.Upsert, callInfo)
 	mock.lockUpsert.Unlock()
-	return mock.UpsertFunc(image)
+	return mock.UpsertFunc(ctx, image)
 }
 
 // UpsertCalls gets all the calls that were made to Upsert.
@@ -65,9 +69,11 @@ func (mock *ImageRepoMock) Upsert(ctx context.Context, image domain.Image) error
 //
 //	len(mockedImageRepo.UpsertCalls())
 func (mock *ImageRepoMock) UpsertCalls() []struct {
+	Ctx   context.Context
 	Image domain.Image
 } {
 	var calls []struct {
+		Ctx   context.Context
 		Image domain.Image
 	}
 	mock.lockUpsert.RLock()

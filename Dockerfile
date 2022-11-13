@@ -1,4 +1,4 @@
-FROM golang:1.19-alpine
+FROM golang:1.19-alpine as builder
 
 COPY --from=migrate/migrate:4 /usr/local/bin/migrate /usr/local/bin/migrate
 RUN apk update && apk add tesseract-ocr
@@ -12,4 +12,7 @@ COPY go.mod .
 COPY go.sum .
 RUN go mod download
 
-ENTRYPOINT ["sleep", "3600"]
+COPY . .
+RUN go build  -o /indexer cmd/indexer/main.go
+
+ENTRYPOINT ["/indexer", "-s3.insecure", "-scrape.interval=1m", "-s3.attempts=3" ]

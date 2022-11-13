@@ -28,28 +28,24 @@ func TestImageRepo(t *testing.T) {
 	t.Run("Upsert replaces description on when the same file id is used", func(t *testing.T) {
 		tt := is.New(t)
 
-		err := repo.Upsert(context.Background(), domain.Image{
+		err := repo.Upsert(ctx, domain.Image{
 			FileID:      testFileID,
 			Description: "original-description",
 		})
 		tt.NoErr(err)
 
-		var desc string
-		query := `select description from image_descriptions where file_id = $1`
-		args := []any{testFileID}
-
-		err = testDB.QueryRow(query, args...).Scan(&desc)
+		gotOrig, err := repo.Get(ctx, testFileID)
 		tt.NoErr(err)
-		tt.Equal(desc, "original-description")
+		tt.Equal(gotOrig.Description, "original-description")
 
 		err = repo.Upsert(context.Background(), domain.Image{
 			FileID:      testFileID,
 			Description: "updated-description",
 		})
 		tt.NoErr(err)
-		err = testDB.QueryRow(query, args...).Scan(&desc)
+		gotUpdated, err := repo.Get(ctx, testFileID)
 		tt.NoErr(err)
-		tt.Equal(desc, "updated-description")
+		tt.Equal(gotUpdated.Description, "updated-description")
 	})
 
 	t.Run("Upsert adds file id to an error in case of query failure", func(t *testing.T) {
@@ -119,7 +115,7 @@ func TestImageRepo(t *testing.T) {
 		tt.True(errors.Is(err, context.Canceled))
 	})
 
-	t.Run("Upsert replaces description on when the same file id is used", func(t *testing.T) {
+	t.Run("GetLastModified returns start of Unix time if there is nothing to find", func(t *testing.T) {
 		tt := is.New(t)
 
 		query := `truncate image_descriptions`
@@ -131,6 +127,25 @@ func TestImageRepo(t *testing.T) {
 
 		tt.NoErr(err)
 		tt.Equal(want, got)
+	})
+
+	t.Run("Get returns wrapped error if there is an error in the query", func(t *testing.T) {
+		tt := is.New(t)
+
+		ctx, cancel := context.WithCancel(ctx)
+		cancel() // inducing error
+
+		_, err := repo.Get(ctx, testFileID)
+
+		tt.True(errors.Is(err, context.Canceled))
+	})
+
+	t.Run("Get returns not found error if fileID does not exist", func(t *testing.T) {
+		tt := is.New(t)
+
+		_, err := repo.Get(ctx, "does-not-exist")
+
+		tt.True(errors.Is(err, ErrRecordNotFound))
 	})
 }
 

@@ -15,6 +15,10 @@ type ImageRepo struct {
 	db *sqlx.DB
 }
 
+var (
+	ErrRecordNotFound = errors.New("record not found")
+)
+
 func NewImageRepo(db *sqlx.DB) *ImageRepo {
 	return &ImageRepo{db: db}
 }
@@ -30,6 +34,23 @@ func (i *ImageRepo) Upsert(ctx context.Context, image domain.Image) error {
 	}
 
 	return nil
+}
+
+func (i *ImageRepo) Get(ctx context.Context, fileID string) (domain.Image, error) {
+	query := `SELECT file_id, description, last_modified FROM image_descriptions where file_id = $1`
+	img := &domain.Image{}
+	err := i.db.GetContext(ctx, img, query, fileID)
+
+	if err != nil {
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			return domain.Image{}, fmt.Errorf("image with file id %s not found, %w", fileID, ErrRecordNotFound)
+		default:
+			return domain.Image{}, fmt.Errorf("looking for last modified, %w", err)
+		}
+	}
+
+	return *img, nil
 }
 
 func (i *ImageRepo) GetLastModified(ctx context.Context) (time.Time, error) {
