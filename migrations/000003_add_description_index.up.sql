@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS image_descriptions_idx;

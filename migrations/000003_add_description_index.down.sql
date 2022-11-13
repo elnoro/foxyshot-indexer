@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS image_description_idx ON image_descriptions USING GIN (to_tsvector('simple', description));
