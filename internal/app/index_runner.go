@@ -7,6 +7,7 @@ import (
 	"time"
 )
 
+//go:generate moq -out index_runner_moq_test.go . listIndexer
 type listIndexer interface {
 	IndexNewList(context.Context, string) error
 }
@@ -23,8 +24,8 @@ func NewIndexRunner(indexer listIndexer, ext string, interval time.Duration) *In
 }
 
 func (i *IndexRunner) Start(ctx context.Context) error {
-	log.Println("starting starting")
-	timer := time.NewTimer(0)
+	log.Println("INFO: running indexer")
+	timer := time.NewTimer(0) // starting immediately
 	for {
 		select {
 		case <-timer.C:

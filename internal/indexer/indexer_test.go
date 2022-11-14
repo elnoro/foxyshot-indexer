@@ -2,6 +2,7 @@ package indexer
 
 import (
 	"context"
+	"errors"
 	"os"
 	"testing"
 	"time"
@@ -9,7 +10,6 @@ import (
 	"github.com/elnoro/foxyshot-indexer/internal/db"
 	"github.com/elnoro/foxyshot-indexer/internal/domain"
 	"github.com/matryer/is"
-	"github.com/pkg/errors"
 )
 
 func TestIndexer_Index(t *testing.T) {
