@@ -1,7 +1,9 @@
 package s3wrapper
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"strings"
@@ -15,15 +17,30 @@ import (
 	"github.com/elnoro/foxyshot-indexer/internal/domain"
 )
 
-type BucketClient struct {
-	client     *s3.S3
-	downloader *s3manager.Downloader
+const tempFilePrefix = "foxyshot_indexer_"
 
-	bucket string
+//go:generate moq -out client_moq_test.go . downloader client
+type downloader interface {
+	Download(io.WriterAt, *s3.GetObjectInput, ...func(*s3manager.Downloader)) (n int64, err error)
 }
 
-func NewClient(client *s3.S3, downloader *s3manager.Downloader, bucket string) *BucketClient {
-	return &BucketClient{client: client, downloader: downloader, bucket: bucket}
+type client interface {
+	HeadBucket(*s3.HeadBucketInput) (*s3.HeadBucketOutput, error)
+	ListObjectsV2(*s3.ListObjectsV2Input) (*s3.ListObjectsV2Output, error)
+}
+
+type BucketClient struct {
+	client     client
+	downloader downloader
+
+	bucket         string
+	tempFilePrefix string
+}
+
+var ErrNoAttempts = errors.New("invalid number of attempts, must be > 0")
+
+func NewClient(c client, d downloader, bucket, tempFilePrefix string) *BucketClient {
+	return &BucketClient{client: c, downloader: d, bucket: bucket, tempFilePrefix: tempFilePrefix}
 }
 
 func NewFromSecrets(key, secret, endpoint, region, bucket string, insecure bool) (*BucketClient, error) {
@@ -42,10 +59,13 @@ func NewFromSecrets(key, secret, endpoint, region, bucket string, insecure bool)
 	s3Client := s3.New(sess)
 	s3Downloader := s3manager.NewDownloader(sess)
 
-	return NewClient(s3Client, s3Downloader, bucket), nil
+	return NewClient(s3Client, s3Downloader, bucket, tempFilePrefix), nil
 }
 
 func (c *BucketClient) CheckConnectivity(attempts int, dur time.Duration) error {
+	if attempts < 1 {
+		return fmt.Errorf("checking connectivity, passed %d, %w", attempts, ErrNoAttempts)
+	}
 	var err error
 	for i := 0; i < attempts; i++ {
 		_, err := c.client.HeadBucket(&s3.HeadBucketInput{Bucket: aws.String(c.bucket)})
@@ -85,7 +105,7 @@ func (c *BucketClient) ListFiles(start time.Time, ext string) ([]domain.File, er
 }
 
 func (c *BucketClient) Download(key string) (*os.File, error) {
-	f, err := os.CreateTemp("", "foxyshot_indexer_")
+	f, err := os.CreateTemp("", c.tempFilePrefix)
 	if err != nil {
 		return nil, fmt.Errorf("creating local image file, %w", err)
 	}
@@ -95,7 +115,7 @@ func (c *BucketClient) Download(key string) (*os.File, error) {
 		Key:    aws.String(key),
 	})
 	if err != nil {
-		return nil, fmt.Errorf("downloading image file from s3, %w", err)
+		return f, fmt.Errorf("downloading image file from s3, %w", err)
 	}
 
 	return f, nil
