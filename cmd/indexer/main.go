@@ -2,12 +2,16 @@ package main
 
 import (
 	"context"
-	"errors"
 	"flag"
+	"fmt"
 	"log"
 	"os"
+	"os/signal"
+	"sync"
+	"syscall"
 	"time"
 
+	"github.com/elnoro/foxyshot-indexer/internal/app"
 	dbadapter "github.com/elnoro/foxyshot-indexer/internal/db"
 	"github.com/elnoro/foxyshot-indexer/internal/indexer"
 	"github.com/go-playground/validator/v10"
@@ -89,40 +93,32 @@ func main() {
 
 	imgRepo := dbadapter.NewImageRepo(db)
 
-	i := indexer.NewIndexer(imgRepo, storage, ocrEngine)
+	idxr := indexer.NewIndexer(imgRepo, storage, ocrEngine)
+	runner := app.NewIndexRunner(idxr, cfg.Ext, cfg.ScrapeInterval)
 
-	ctx := context.Background()
-	for {
-		lastModified, err := imgRepo.GetLastModified(ctx)
+	ctx, cancel := context.WithCancel(context.Background())
+
+	wg := sync.WaitGroup{}
+
+	log.Println("starting")
+	go func() {
+		wg.Add(1)
+		err := runner.Start(ctx)
 		if err != nil {
-			log.Fatal(err) // if there is something wrong with the db we fail the app and let a supervisor restart it
-		}
-		files, err := storage.ListFiles(lastModified, cfg.Ext)
-		if err != nil {
-			log.Fatal(err)
+			log.Println("shutting down indexer runner", err)
 		}
 
-		for _, file := range files {
-			_, err := imgRepo.Get(ctx, file.Key)
-			if err != nil && !errors.Is(err, dbadapter.ErrRecordNotFound) {
-				log.Println("ERROR: failed to check:", err)
-				continue
-			}
-			if nil == err {
-				log.Printf("INFO: %s already processed, skipping\n", file.Key)
-				continue
-			}
+		wg.Done()
+	}()
 
-			err = i.Index(file)
-			if err != nil {
-				log.Println("ERROR: failed to index:", err)
-			} else {
-				log.Println("INFO: added", file)
-			}
-		}
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
-		time.Sleep(cfg.ScrapeInterval)
-	}
+	s := <-quit
+
+	fmt.Printf("Received %s signal\n", s.String())
+	cancel()
+	wg.Wait()
 }
 
 func validateConfig(cfg Config) error {

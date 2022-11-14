@@ -8,6 +8,7 @@ import (
 	"github.com/elnoro/foxyshot-indexer/internal/domain"
 	"os"
 	"sync"
+	"time"
 )
 
 // Ensure, that ImageRepoMock does implement ImageRepo.
@@ -20,6 +21,12 @@ var _ ImageRepo = &ImageRepoMock{}
 //
 //		// make and configure a mocked ImageRepo
 //		mockedImageRepo := &ImageRepoMock{
+//			GetFunc: func(ctx context.Context, fileID string) (domain.Image, error) {
+//				panic("mock out the Get method")
+//			},
+//			GetLastModifiedFunc: func(ctx context.Context) (time.Time, error) {
+//				panic("mock out the GetLastModified method")
+//			},
 //			UpsertFunc: func(ctx context.Context, image domain.Image) error {
 //				panic("mock out the Upsert method")
 //			},
@@ -30,11 +37,29 @@ var _ ImageRepo = &ImageRepoMock{}
 //
 //	}
 type ImageRepoMock struct {
+	// GetFunc mocks the Get method.
+	GetFunc func(ctx context.Context, fileID string) (domain.Image, error)
+
+	// GetLastModifiedFunc mocks the GetLastModified method.
+	GetLastModifiedFunc func(ctx context.Context) (time.Time, error)
+
 	// UpsertFunc mocks the Upsert method.
 	UpsertFunc func(ctx context.Context, image domain.Image) error
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// Get holds details about calls to the Get method.
+		Get []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// FileID is the fileID argument value.
+			FileID string
+		}
+		// GetLastModified holds details about calls to the GetLastModified method.
+		GetLastModified []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+		}
 		// Upsert holds details about calls to the Upsert method.
 		Upsert []struct {
 			// Ctx is the ctx argument value.
@@ -43,7 +68,77 @@ type ImageRepoMock struct {
 			Image domain.Image
 		}
 	}
-	lockUpsert sync.RWMutex
+	lockGet             sync.RWMutex
+	lockGetLastModified sync.RWMutex
+	lockUpsert          sync.RWMutex
+}
+
+// Get calls GetFunc.
+func (mock *ImageRepoMock) Get(ctx context.Context, fileID string) (domain.Image, error) {
+	if mock.GetFunc == nil {
+		panic("ImageRepoMock.GetFunc: method is nil but ImageRepo.Get was just called")
+	}
+	callInfo := struct {
+		Ctx    context.Context
+		FileID string
+	}{
+		Ctx:    ctx,
+		FileID: fileID,
+	}
+	mock.lockGet.Lock()
+	mock.calls.Get = append(mock.calls.Get, callInfo)
+	mock.lockGet.Unlock()
+	return mock.GetFunc(ctx, fileID)
+}
+
+// GetCalls gets all the calls that were made to Get.
+// Check the length with:
+//
+//	len(mockedImageRepo.GetCalls())
+func (mock *ImageRepoMock) GetCalls() []struct {
+	Ctx    context.Context
+	FileID string
+} {
+	var calls []struct {
+		Ctx    context.Context
+		FileID string
+	}
+	mock.lockGet.RLock()
+	calls = mock.calls.Get
+	mock.lockGet.RUnlock()
+	return calls
+}
+
+// GetLastModified calls GetLastModifiedFunc.
+func (mock *ImageRepoMock) GetLastModified(ctx context.Context) (time.Time, error) {
+	if mock.GetLastModifiedFunc == nil {
+		panic("ImageRepoMock.GetLastModifiedFunc: method is nil but ImageRepo.GetLastModified was just called")
+	}
+	callInfo := struct {
+		Ctx context.Context
+	}{
+		Ctx: ctx,
+	}
+	mock.lockGetLastModified.Lock()
+	mock.calls.GetLastModified = append(mock.calls.GetLastModified, callInfo)
+	mock.lockGetLastModified.Unlock()
+	return mock.GetLastModifiedFunc(ctx)
+}
+
+// GetLastModifiedCalls gets all the calls that were made to GetLastModified.
+// Check the length with:
+//
+//	len(mockedImageRepo.GetLastModifiedCalls())
+func (mock *ImageRepoMock) GetLastModifiedCalls() []struct {
+	Ctx context.Context
+} {
+	var calls []struct {
+		Ctx context.Context
+	}
+	mock.lockGetLastModified.RLock()
+	calls = mock.calls.GetLastModified
+	mock.lockGetLastModified.RUnlock()
+	return calls
 }
 
 // Upsert calls UpsertFunc.
@@ -95,6 +190,9 @@ var _ FileStorage = &FileStorageMock{}
 //			DownloadFunc: func(key string) (*os.File, error) {
 //				panic("mock out the Download method")
 //			},
+//			ListFilesFunc: func(start time.Time, ext string) ([]domain.File, error) {
+//				panic("mock out the ListFiles method")
+//			},
 //		}
 //
 //		// use mockedFileStorage in code that requires FileStorage
@@ -105,6 +203,9 @@ type FileStorageMock struct {
 	// DownloadFunc mocks the Download method.
 	DownloadFunc func(key string) (*os.File, error)
 
+	// ListFilesFunc mocks the ListFiles method.
+	ListFilesFunc func(start time.Time, ext string) ([]domain.File, error)
+
 	// calls tracks calls to the methods.
 	calls struct {
 		// Download holds details about calls to the Download method.
@@ -112,8 +213,16 @@ type FileStorageMock struct {
 			// Key is the key argument value.
 			Key string
 		}
+		// ListFiles holds details about calls to the ListFiles method.
+		ListFiles []struct {
+			// Start is the start argument value.
+			Start time.Time
+			// Ext is the ext argument value.
+			Ext string
+		}
 	}
-	lockDownload sync.RWMutex
+	lockDownload  sync.RWMutex
+	lockListFiles sync.RWMutex
 }
 
 // Download calls DownloadFunc.
@@ -145,6 +254,42 @@ func (mock *FileStorageMock) DownloadCalls() []struct {
 	mock.lockDownload.RLock()
 	calls = mock.calls.Download
 	mock.lockDownload.RUnlock()
+	return calls
+}
+
+// ListFiles calls ListFilesFunc.
+func (mock *FileStorageMock) ListFiles(start time.Time, ext string) ([]domain.File, error) {
+	if mock.ListFilesFunc == nil {
+		panic("FileStorageMock.ListFilesFunc: method is nil but FileStorage.ListFiles was just called")
+	}
+	callInfo := struct {
+		Start time.Time
+		Ext   string
+	}{
+		Start: start,
+		Ext:   ext,
+	}
+	mock.lockListFiles.Lock()
+	mock.calls.ListFiles = append(mock.calls.ListFiles, callInfo)
+	mock.lockListFiles.Unlock()
+	return mock.ListFilesFunc(start, ext)
+}
+
+// ListFilesCalls gets all the calls that were made to ListFiles.
+// Check the length with:
+//
+//	len(mockedFileStorage.ListFilesCalls())
+func (mock *FileStorageMock) ListFilesCalls() []struct {
+	Start time.Time
+	Ext   string
+} {
+	var calls []struct {
+		Start time.Time
+		Ext   string
+	}
+	mock.lockListFiles.RLock()
+	calls = mock.calls.ListFiles
+	mock.lockListFiles.RUnlock()
 	return calls
 }
 

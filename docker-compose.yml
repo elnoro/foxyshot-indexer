@@ -17,6 +17,11 @@ services:
     depends_on:
       - db
       - minio
+    logging: &default_logging
+      driver: json-file
+      options:
+        max-size: "1m"
+        max-file: "5"
   db:
     image: postgres:15
     restart: always
@@ -28,6 +33,7 @@ services:
       POSTGRES_PASSWORD: $DBPASS
       POSTGRES_USER: $DBUSER
       POSTGRES_DB: $DBNAME
+    logging: *default_logging
   minio:
     image: bitnami/minio
     ports:
@@ -39,6 +45,7 @@ services:
       - MINIO_ROOT_USER=$S3_KEY
       - MINIO_ROOT_PASSWORD=$S3_SECRET
       - MINIO_DEFAULT_BUCKETS=$S3_BUCKET:public
+    logging: *default_logging
 volumes:
   db-data:
     driver: local
