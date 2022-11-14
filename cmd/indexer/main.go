@@ -35,7 +35,7 @@ type S3Config struct {
 	Endpoint      string `validate:"required"`
 	Region        string `validate:"required"`
 	Bucket        string `validate:"required"`
-	Insecure      bool   `validate:"required"`
+	Insecure      bool
 	RetryAttempts int
 	RetryDuration time.Duration
 }
