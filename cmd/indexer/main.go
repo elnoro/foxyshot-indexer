@@ -23,6 +23,7 @@ import (
 )
 
 type Config struct {
+	Port           int           `validate:"required"`
 	ScrapeInterval time.Duration `validate:"required"`
 	Ext            string        `validate:"required"`
 	DSN            string        `validate:"required"`
@@ -40,8 +41,12 @@ type S3Config struct {
 	RetryDuration time.Duration
 }
 
+var version = "development"
+
 func main() {
 	cfg := Config{}
+
+	flag.IntVar(&cfg.Port, "web.port", 8080, "API server port")
 
 	flag.DurationVar(&cfg.ScrapeInterval, "scrape.interval", 15*time.Minute, "how often to scrape s3")
 	flag.StringVar(&cfg.Ext, "ext", ".jpg", "file extensions to use")
@@ -90,6 +95,12 @@ func main() {
 	if err != nil {
 		log.Fatal("sqlx error", err)
 	}
+	defer func(db *sqlx.DB) {
+		err := db.Close()
+		if err != nil {
+			log.Println("database closing error,", err)
+		}
+	}(db)
 
 	imgRepo := dbadapter.NewImageRepo(db)
 
@@ -100,15 +111,23 @@ func main() {
 
 	wg := sync.WaitGroup{}
 
-	log.Println("starting")
+	web := &webApp{config: cfg, log: log.Default()}
 	go func() {
 		wg.Add(1)
+		defer wg.Done()
+		err := web.serve(ctx)
+		if err != nil {
+			log.Println("web server error:", err)
+		}
+	}()
+
+	go func() {
+		wg.Add(1)
+		defer wg.Done()
 		err := runner.Start(ctx)
 		if err != nil {
-			log.Println("shutting down indexer runner", err)
+			log.Println("index runner error:", err)
 		}
-
-		wg.Done()
 	}()
 
 	quit := make(chan os.Signal, 1)
