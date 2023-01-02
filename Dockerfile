@@ -11,7 +11,7 @@ RUN go mod download
 COPY --from=migrate/migrate:4 /usr/local/bin/migrate /service/migrate
 
 COPY . .
-RUN go build -o /service/indexer ./cmd/indexer/main.go
+RUN go build -ldflags='-w -s' -o /service/indexer ./cmd/indexer
 RUN cp -R migrations /service
 
 FROM alpine:3.16
