@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"expvar"
 	"fmt"
 	"log"
 	"net/http"
@@ -18,6 +19,7 @@ type webApp struct {
 func (app *webApp) routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthcheck", app.healthcheckHandler)
+	mux.Handle("/debug/vars", expvar.Handler())
 
 	return mux
 }
