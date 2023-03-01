@@ -1,4 +1,4 @@
-FROM golang:1.19-alpine as builder
+FROM golang:1.20-alpine as builder
 
 COPY --from=migrate/migrate:4 /usr/local/bin/migrate /usr/local/bin/migrate
 RUN apk update && apk add tesseract-ocr

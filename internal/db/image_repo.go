@@ -36,6 +36,25 @@ func (i *ImageRepo) Upsert(ctx context.Context, image domain.Image) error {
 	return nil
 }
 
+func (i *ImageRepo) Search(ctx context.Context, searchString string, page, perPage int) ([]domain.Image, error) {
+	pattern := "%" + searchString + "%"
+	limit := perPage
+	offset := (page - 1) * perPage
+
+	var imgs []domain.Image
+	query := `SELECT file_id, description, last_modified 
+		FROM image_descriptions 
+		WHERE description like $1
+		ORDER BY last_modified desc LIMIT $2 OFFSET $3`
+	args := []any{pattern, limit, offset}
+	err := i.db.SelectContext(ctx, &imgs, query, args...)
+	if err != nil {
+		return imgs, fmt.Errorf("searching for images with query %s, %w", query, err)
+	}
+
+	return imgs, nil
+}
+
 func (i *ImageRepo) Get(ctx context.Context, fileID string) (domain.Image, error) {
 	query := `SELECT file_id, description, last_modified FROM image_descriptions where file_id = $1`
 	img := &domain.Image{}

@@ -111,7 +111,12 @@ func main() {
 
 	wg := sync.WaitGroup{}
 
-	web := &webApp{config: cfg, log: log.Default()}
+	web := &webApp{
+		config: cfg,
+		log:    log.Default(),
+
+		imageSearcher: imgRepo,
+	}
 	go func() {
 		wg.Add(1)
 		defer wg.Done()

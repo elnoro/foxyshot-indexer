@@ -9,17 +9,27 @@ import (
 	"log"
 	"net/http"
 	"time"
+
+	"github.com/elnoro/foxyshot-indexer/internal/domain"
 )
+
+type imageSearcher interface {
+	Search(ctx context.Context, searchString string, page, perPage int) ([]domain.Image, error)
+}
 
 type webApp struct {
 	config Config
 	log    *log.Logger
+
+	imageSearcher imageSearcher
 }
 
 func (app *webApp) routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthcheck", app.healthcheckHandler)
 	mux.Handle("/debug/vars", expvar.Handler())
+
+	mux.HandleFunc("/api/search", app.searchHandler)
 
 	return mux
 }

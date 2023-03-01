@@ -129,6 +129,40 @@ func TestImageRepo(t *testing.T) {
 		tt.Equal(want, got)
 	})
 
+	t.Run("Search returns images with descriptions matching search string", func(t *testing.T) {
+		tt := is.New(t)
+
+		err := repo.Upsert(ctx, domain.Image{
+			FileID:      "expected-found-id",
+			Description: "find me",
+		})
+		tt.NoErr(err)
+
+		err = repo.Upsert(ctx, domain.Image{
+			FileID:      "expected-not-found-id",
+			Description: "skip me",
+		})
+		tt.NoErr(err)
+
+		images, err := repo.Search(ctx, "find me", 1, 100)
+		tt.NoErr(err)
+
+		tt.Equal(1, len(images))
+		tt.Equal("expected-found-id", images[0].FileID)
+	})
+
+	t.Run("Search returns error if there is an error in the query", func(t *testing.T) {
+		tt := is.New(t)
+
+		ctx, cancel := context.WithCancel(ctx)
+		cancel()
+
+		images, err := repo.Search(ctx, "find me", 1, 100)
+		tt.Equal(0, len(images))
+		tt.True(errors.Is(err, context.Canceled))
+
+	})
+
 	t.Run("Get returns wrapped error if there is an error in the query", func(t *testing.T) {
 		tt := is.New(t)
 
