@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"expvar"
 	"fmt"
@@ -66,25 +65,4 @@ func (app *webApp) serve(ctx context.Context) error {
 	app.log.Println("server stopped")
 
 	return nil
-}
-
-func (app *webApp) healthcheckHandler(w http.ResponseWriter, _ *http.Request) {
-	healthcheck := map[string]string{
-		"status":  "available",
-		"version": version,
-	}
-
-	res, err := json.Marshal(healthcheck)
-	if err != nil {
-		app.log.Println("err", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	_, err = w.Write(res)
-	if err != nil {
-		app.log.Println(err)
-	}
 }
