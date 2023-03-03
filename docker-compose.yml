@@ -1,8 +1,7 @@
 version: "3.9"
 services:
   app:
-    build:
-      context: .
+    image: ghcr.io/elnoro/indexer
     restart: always
     environment:
       - S3_ENDPOINT

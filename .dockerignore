@@ -6,3 +6,4 @@ docker-compose.yml
 docker-compose-dev.yml
 .gitignore
 .DS_Store
+tmp/

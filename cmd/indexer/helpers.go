@@ -35,8 +35,8 @@ func (app *webApp) malformedJSON(r *http.Request, w http.ResponseWriter) {
 	app.errorResponse(r, w, http.StatusBadRequest, "malformed json")
 }
 
-func (app *webApp) validationError(r *http.Request, w http.ResponseWriter) {
-	app.errorResponse(r, w, http.StatusBadRequest, "malformed json")
+func (app *webApp) validationError(r *http.Request, w http.ResponseWriter, err error) {
+	app.errorResponse(r, w, http.StatusBadRequest, err.Error())
 }
 
 func (app *webApp) serverError(r *http.Request, w http.ResponseWriter, err error) {

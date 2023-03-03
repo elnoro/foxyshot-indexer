@@ -68,7 +68,7 @@ func (c *BucketClient) CheckConnectivity(attempts int, dur time.Duration) error 
 	}
 	var err error
 	for i := 0; i < attempts; i++ {
-		_, err := c.client.HeadBucket(&s3.HeadBucketInput{Bucket: aws.String(c.bucket)})
+		_, err = c.client.HeadBucket(&s3.HeadBucketInput{Bucket: aws.String(c.bucket)})
 		if err != nil {
 			time.Sleep(dur)
 			continue
@@ -87,7 +87,7 @@ func (c *BucketClient) ListFiles(start time.Time, ext string) ([]domain.File, er
 	}
 	log.Println("[s3] received", len(listObjsResponse.Contents), "objects")
 
-	var files []domain.File
+	var files []domain.File //nolint:prealloc
 	for _, object := range listObjsResponse.Contents {
 		if object.LastModified.Before(start) {
 			continue

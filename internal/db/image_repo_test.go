@@ -77,6 +77,7 @@ func TestImageRepo(t *testing.T) {
 		want = want.Add(1 * time.Second)
 		img.LastModified = want
 		err = repo.Upsert(ctx, *img)
+		tt.NoErr(err)
 
 		got, err = repo.GetLastModified(ctx)
 		tt.NoErr(err)
@@ -98,6 +99,7 @@ func TestImageRepo(t *testing.T) {
 		want = want.Add(1 * time.Second)
 		img.LastModified = want
 		err = repo.Upsert(ctx, *img)
+		tt.NoErr(err)
 
 		got, err = repo.GetLastModified(ctx)
 		tt.NoErr(err)

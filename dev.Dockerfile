@@ -1,12 +1,10 @@
-FROM golang:1.20-alpine as builder
+FROM golang:1.20-alpine
 
 COPY --from=migrate/migrate:4 /usr/local/bin/migrate /usr/local/bin/migrate
-RUN apk update && apk add tesseract-ocr
+RUN apk update && apk add tesseract-ocr gcc
 RUN go install github.com/matryer/moq@latest
-RUN go install github.com/go-delve/delve/cmd/dlv@latest
 RUN go install github.com/cosmtrek/air@latest
-
-ENV CGO_ENABLED=0
+RUN apk add musl-dev
 
 WORKDIR /app
 

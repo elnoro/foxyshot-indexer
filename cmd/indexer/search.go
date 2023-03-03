@@ -19,7 +19,7 @@ func (app *webApp) searchHandler(w http.ResponseWriter, r *http.Request) {
 
 	err = app.validate(req)
 	if err != nil {
-		app.errorResponse(r, w, http.StatusBadRequest, err.Error())
+		app.validationError(r, w, err)
 		return
 	}
 

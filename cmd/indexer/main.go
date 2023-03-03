@@ -117,8 +117,9 @@ func main() {
 
 		imageSearcher: imgRepo,
 	}
+
+	wg.Add(1)
 	go func() {
-		wg.Add(1)
 		defer wg.Done()
 		err := web.serve(ctx)
 		if err != nil {
@@ -126,8 +127,8 @@ func main() {
 		}
 	}()
 
+	wg.Add(1)
 	go func() {
-		wg.Add(1)
 		defer wg.Done()
 		err := runner.Start(ctx)
 		if err != nil {
