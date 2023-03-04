@@ -55,6 +55,16 @@ func (i *ImageRepo) Search(ctx context.Context, searchString string, page, perPa
 	return imgs, nil
 }
 
+func (i *ImageRepo) Delete(ctx context.Context, fileID string) error {
+	query := `DELETE FROM image_descriptions where file_id = $1`
+	_, err := i.db.ExecContext(ctx, query, fileID)
+	if err != nil {
+		return fmt.Errorf("deleting image id=%s, %w", fileID, err)
+	}
+
+	return nil
+}
+
 func (i *ImageRepo) Get(ctx context.Context, fileID string) (domain.Image, error) {
 	query := `SELECT file_id, description, last_modified FROM image_descriptions where file_id = $1`
 	img := &domain.Image{}

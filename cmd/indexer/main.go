@@ -14,6 +14,7 @@ import (
 	"github.com/elnoro/foxyshot-indexer/internal/app"
 	dbadapter "github.com/elnoro/foxyshot-indexer/internal/db"
 	"github.com/elnoro/foxyshot-indexer/internal/indexer"
+	"github.com/elnoro/foxyshot-indexer/internal/monitoring"
 	"github.com/go-playground/validator/v10"
 	_ "github.com/jackc/pgx/stdlib"
 	"github.com/jmoiron/sqlx"
@@ -91,6 +92,12 @@ func main() {
 		log.Fatal(err)
 	}
 
+	tracker := monitoring.NewTracker()
+	err = tracker.Register()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	db, err := sqlx.Connect("pgx", cfg.DSN)
 	if err != nil {
 		log.Fatal("sqlx error", err)
@@ -104,7 +111,7 @@ func main() {
 
 	imgRepo := dbadapter.NewImageRepo(db)
 
-	idxr := indexer.NewIndexer(imgRepo, storage, ocrEngine)
+	idxr := indexer.NewIndexer(imgRepo, storage, ocrEngine, tracker)
 	runner := app.NewIndexRunner(idxr, cfg.Ext, cfg.ScrapeInterval)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -115,7 +122,9 @@ func main() {
 		config: cfg,
 		log:    log.Default(),
 
-		imageSearcher: imgRepo,
+		imageDescriptions: imgRepo,
+		fileStorage:       storage,
+		tracker:           tracker,
 	}
 
 	wg.Add(1)

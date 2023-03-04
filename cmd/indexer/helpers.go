@@ -23,6 +23,10 @@ func (app *webApp) respondJSON(r *http.Request, w http.ResponseWriter, status in
 	}
 }
 
+func (app *webApp) respondNoContent(_ *http.Request, w http.ResponseWriter) {
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (app *webApp) parseJSON(r *http.Request, o any) error {
 	err := json.NewDecoder(r.Body).Decode(o)
 	if err != nil {

@@ -1,6 +1,7 @@
 package s3wrapper
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -27,6 +28,7 @@ type downloader interface {
 type client interface {
 	HeadBucket(*s3.HeadBucketInput) (*s3.HeadBucketOutput, error)
 	ListObjectsV2(*s3.ListObjectsV2Input) (*s3.ListObjectsV2Output, error)
+	DeleteObject(object *s3.DeleteObjectInput) (*s3.DeleteObjectOutput, error)
 }
 
 type BucketClient struct {
@@ -119,4 +121,16 @@ func (c *BucketClient) Download(key string) (*os.File, error) {
 	}
 
 	return f, nil
+}
+
+func (c *BucketClient) DeleteFile(_ context.Context, key string) error {
+	_, err := c.client.DeleteObject(&s3.DeleteObjectInput{
+		Bucket: aws.String(c.bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return fmt.Errorf("deleting file %s from s3, %w", key, err)
+	}
+
+	return nil
 }

@@ -10,25 +10,38 @@ import (
 	"time"
 
 	"github.com/elnoro/foxyshot-indexer/internal/domain"
+	"github.com/elnoro/foxyshot-indexer/internal/monitoring"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-type imageSearcher interface {
+type imageRepo interface {
 	Search(ctx context.Context, searchString string, page, perPage int) ([]domain.Image, error)
+	Delete(ctx context.Context, fileID string) error
+}
+
+type fileStorage interface {
+	DeleteFile(ctx context.Context, key string) error
 }
 
 type webApp struct {
 	config Config
 	log    *log.Logger
 
-	imageSearcher imageSearcher
+	imageDescriptions imageRepo
+	fileStorage       fileStorage
+
+	tracker *monitoring.Tracker
 }
 
 func (app *webApp) routes() http.Handler {
 	mux := http.NewServeMux()
+
 	mux.HandleFunc("/healthcheck", app.healthcheckHandler)
 	mux.Handle("/debug/vars", expvar.Handler())
+	mux.Handle("/metrics", promhttp.Handler())
 
 	mux.HandleFunc("/api/search", app.searchHandler)
+	mux.HandleFunc("/api/delete", app.deleteHandler)
 
 	return mux
 }

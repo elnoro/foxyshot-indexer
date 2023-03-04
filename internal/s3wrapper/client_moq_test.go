@@ -98,6 +98,9 @@ var _ client = &clientMock{}
 //
 //		// make and configure a mocked client
 //		mockedclient := &clientMock{
+//			DeleteObjectFunc: func(object *s3.DeleteObjectInput) (*s3.DeleteObjectOutput, error) {
+//				panic("mock out the DeleteObject method")
+//			},
 //			HeadBucketFunc: func(headBucketInput *s3.HeadBucketInput) (*s3.HeadBucketOutput, error) {
 //				panic("mock out the HeadBucket method")
 //			},
@@ -111,6 +114,9 @@ var _ client = &clientMock{}
 //
 //	}
 type clientMock struct {
+	// DeleteObjectFunc mocks the DeleteObject method.
+	DeleteObjectFunc func(object *s3.DeleteObjectInput) (*s3.DeleteObjectOutput, error)
+
 	// HeadBucketFunc mocks the HeadBucket method.
 	HeadBucketFunc func(headBucketInput *s3.HeadBucketInput) (*s3.HeadBucketOutput, error)
 
@@ -119,6 +125,11 @@ type clientMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// DeleteObject holds details about calls to the DeleteObject method.
+		DeleteObject []struct {
+			// Object is the object argument value.
+			Object *s3.DeleteObjectInput
+		}
 		// HeadBucket holds details about calls to the HeadBucket method.
 		HeadBucket []struct {
 			// HeadBucketInput is the headBucketInput argument value.
@@ -130,8 +141,41 @@ type clientMock struct {
 			ListObjectsV2Input *s3.ListObjectsV2Input
 		}
 	}
+	lockDeleteObject  sync.RWMutex
 	lockHeadBucket    sync.RWMutex
 	lockListObjectsV2 sync.RWMutex
+}
+
+// DeleteObject calls DeleteObjectFunc.
+func (mock *clientMock) DeleteObject(object *s3.DeleteObjectInput) (*s3.DeleteObjectOutput, error) {
+	if mock.DeleteObjectFunc == nil {
+		panic("clientMock.DeleteObjectFunc: method is nil but client.DeleteObject was just called")
+	}
+	callInfo := struct {
+		Object *s3.DeleteObjectInput
+	}{
+		Object: object,
+	}
+	mock.lockDeleteObject.Lock()
+	mock.calls.DeleteObject = append(mock.calls.DeleteObject, callInfo)
+	mock.lockDeleteObject.Unlock()
+	return mock.DeleteObjectFunc(object)
+}
+
+// DeleteObjectCalls gets all the calls that were made to DeleteObject.
+// Check the length with:
+//
+//	len(mockedclient.DeleteObjectCalls())
+func (mock *clientMock) DeleteObjectCalls() []struct {
+	Object *s3.DeleteObjectInput
+} {
+	var calls []struct {
+		Object *s3.DeleteObjectInput
+	}
+	mock.lockDeleteObject.RLock()
+	calls = mock.calls.DeleteObject
+	mock.lockDeleteObject.RUnlock()
+	return calls
 }
 
 // HeadBucket calls HeadBucketFunc.

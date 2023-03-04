@@ -172,6 +172,25 @@ func TestImageRepo(t *testing.T) {
 		tt.NoErr(err)
 	})
 
+	t.Run("Delete returns nil if removal is successful", func(t *testing.T) {
+		tt := is.New(t)
+
+		err := repo.Upsert(ctx, domain.Image{FileID: "delete-me"})
+		tt.NoErr(err)
+		err = repo.Delete(ctx, "delete-me")
+		tt.NoErr(err)
+	})
+
+	t.Run("Delete returns error if removal has failed", func(t *testing.T) {
+		tt := is.New(t)
+
+		ctx, cancel := context.WithCancel(ctx)
+		cancel() // inducing error
+		err := repo.Delete(ctx, "delete-me")
+
+		tt.True(errors.Is(err, context.Canceled))
+	})
+
 	t.Run("Get returns wrapped error if there is an error in the query", func(t *testing.T) {
 		tt := is.New(t)
 

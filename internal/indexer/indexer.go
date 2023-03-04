@@ -10,6 +10,7 @@ import (
 
 	dbadapter "github.com/elnoro/foxyshot-indexer/internal/db"
 	"github.com/elnoro/foxyshot-indexer/internal/domain"
+	"github.com/elnoro/foxyshot-indexer/internal/monitoring"
 )
 
 //go:generate moq -out indexer_moq_test.go . ImageRepo FileStorage OCR
@@ -32,10 +33,17 @@ type Indexer struct {
 	imageRepo ImageRepo
 	storage   FileStorage
 	ocrEngine OCR
+
+	tracker *monitoring.Tracker
 }
 
-func NewIndexer(imageRepo ImageRepo, storage FileStorage, ocrEngine OCR) *Indexer {
-	return &Indexer{imageRepo: imageRepo, storage: storage, ocrEngine: ocrEngine}
+func NewIndexer(
+	imageRepo ImageRepo,
+	storage FileStorage,
+	ocrEngine OCR,
+	tracker *monitoring.Tracker,
+) *Indexer {
+	return &Indexer{imageRepo: imageRepo, storage: storage, ocrEngine: ocrEngine, tracker: tracker}
 }
 
 func (i *Indexer) IndexNewList(ctx context.Context, pattern string) error {
@@ -64,6 +72,7 @@ func (i *Indexer) IndexNewList(ctx context.Context, pattern string) error {
 			log.Println("ERROR: failed to index:", err)
 		} else {
 			log.Println("INFO: added", file)
+			i.tracker.OnIndex()
 		}
 	}
 

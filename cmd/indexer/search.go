@@ -24,11 +24,12 @@ func (app *webApp) searchHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := context.Background()
-	images, err := app.imageSearcher.Search(ctx, req.Search, req.Page, req.PerPage)
+	images, err := app.imageDescriptions.Search(ctx, req.Search, req.Page, req.PerPage)
 	if err != nil {
 		app.serverError(r, w, err)
 		return
 	}
+	app.tracker.OnSearch()
 
 	app.respondJSON(r, w, http.StatusOK, images)
 }
