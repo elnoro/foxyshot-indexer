@@ -162,7 +162,14 @@ func TestImageRepo(t *testing.T) {
 		images, err := repo.Search(ctx, "find me", 1, 100)
 		tt.Equal(0, len(images))
 		tt.True(errors.Is(err, context.Canceled))
+	})
 
+	t.Run("Search returns empty slice if there is nothing to be found", func(t *testing.T) {
+		tt := is.New(t)
+
+		images, err := repo.Search(ctx, "skipme", 1, 100)
+		tt.Equal([]domain.Image{}, images)
+		tt.NoErr(err)
 	})
 
 	t.Run("Get returns wrapped error if there is an error in the query", func(t *testing.T) {

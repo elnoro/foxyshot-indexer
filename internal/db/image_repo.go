@@ -41,7 +41,7 @@ func (i *ImageRepo) Search(ctx context.Context, searchString string, page, perPa
 	limit := perPage
 	offset := (page - 1) * perPage
 
-	var imgs []domain.Image
+	imgs := []domain.Image{}
 	query := `SELECT file_id, description, last_modified 
 		FROM image_descriptions 
 		WHERE (to_tsvector('simple', description) @@ plainto_tsquery('simple', $1) OR $1 = '')
