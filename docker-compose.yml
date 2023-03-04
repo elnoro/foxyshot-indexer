@@ -11,7 +11,18 @@ services:
       - S3_PUBLIC
       - DB_DSN=postgres://$DBUSER:$DBPASS@db/$DBNAME
     depends_on:
-      - db
+      migrate:
+        condition: service_completed_successfully
+
+  migrate:
+    image: ghcr.io/elnoro/indexer
+    environment:
+      - DB_DSN=postgres://$DBUSER:$DBPASS@db/$DBNAME?sslmode=disable
+    depends_on:
+      db:
+        condition: service_healthy
+    entrypoint: sh -c '/service/migrate -database="$${DB_DSN}" -path=./migrations up'
+
   db:
     image: postgres:15
     restart: always
@@ -21,6 +32,14 @@ services:
       POSTGRES_PASSWORD: $DBPASS
       POSTGRES_USER: $DBUSER
       POSTGRES_DB: $DBNAME
+      PGUSER: $DBUSER
+      PGDATABASE: $DBNAME
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
 volumes:
   db-data:
     driver: local
