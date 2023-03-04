@@ -18,13 +18,31 @@ services:
     ports:
       - "8080:8080"
     depends_on:
-      - db
-      - minio
+      migrate:
+        condition: service_completed_successfully
+      minio:
+        condition: service_started
     logging: &default_logging
       driver: json-file
       options:
         max-size: "1m"
         max-file: "5"
+
+  migrate:
+    build:
+      context: .
+      dockerfile: dev.Dockerfile
+    working_dir: /app
+    volumes:
+      - ./migrations:/app/migrations
+    environment:
+      - DB_DSN=postgres://$DBUSER:$DBPASS@db/$DBNAME?sslmode=disable
+    logging: *default_logging
+    depends_on:
+      db:
+        condition: service_healthy
+    entrypoint: sh -c 'migrate -database="$${DB_DSN}" -path=./migrations up'
+
   db:
     image: postgres:15
     restart: always
@@ -36,7 +54,15 @@ services:
       POSTGRES_PASSWORD: $DBPASS
       POSTGRES_USER: $DBUSER
       POSTGRES_DB: $DBNAME
+      PGUSER: $DBUSER
+      PGDATABASE: $DBNAME
     logging: *default_logging
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   minio:
     image: bitnami/minio
     ports:
