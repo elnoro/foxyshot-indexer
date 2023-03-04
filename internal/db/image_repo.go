@@ -44,7 +44,7 @@ func (i *ImageRepo) Search(ctx context.Context, searchString string, page, perPa
 	var imgs []domain.Image
 	query := `SELECT file_id, description, last_modified 
 		FROM image_descriptions 
-		WHERE description like $1
+		WHERE (to_tsvector('simple', description) @@ plainto_tsquery('simple', $1) OR $1 = '')
 		ORDER BY last_modified desc LIMIT $2 OFFSET $3`
 	args := []any{pattern, limit, offset}
 	err := i.db.SelectContext(ctx, &imgs, query, args...)

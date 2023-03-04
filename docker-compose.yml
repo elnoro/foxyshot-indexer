@@ -3,6 +3,7 @@ services:
   app:
     image: ghcr.io/elnoro/indexer
     restart: always
+    container_name: indexer_app
     environment:
       - S3_ENDPOINT
       - S3_KEY
@@ -16,6 +17,7 @@ services:
 
   migrate:
     image: ghcr.io/elnoro/indexer
+    container_name: indexer_migrate
     environment:
       - DB_DSN=postgres://$DBUSER:$DBPASS@db/$DBNAME?sslmode=disable
     depends_on:

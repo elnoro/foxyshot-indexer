@@ -9,6 +9,11 @@ For initial install, run:
 $ docker compose up -d
 ```
 
+For continuous delivery run:
+```
+$ docker compose -f docker-compose-operations.yml up -d
+```
+
 ## Development
 
 The project is designed for development in docker. 

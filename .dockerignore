@@ -4,6 +4,7 @@
 .env.dist
 docker-compose.yml
 docker-compose-dev.yml
+docker-compose-operations.yml
 .gitignore
 .DS_Store
 tmp/

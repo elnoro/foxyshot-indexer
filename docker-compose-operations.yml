@@ -1,0 +1,15 @@
+version: "3.9"
+services:
+  watchtower: # updates app and migrate containers
+    image: containrrr/watchtower
+    container_name: watchtower
+    environment:
+      WATCHTOWER_INCLUDE_STOPPED: true
+      WATCHTOWER_REVIVE_STOPPED: true
+      WATCHTOWER_POLL_INTERVAL: 30
+      WATCHTOWER_CLEANUP: true
+      REPO_USER: $REGISTRY_USER
+      REPO_PASS: $REGISTRY_PASS
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: ["indexer_app", "indexer_migrate"]
