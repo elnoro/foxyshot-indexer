@@ -66,3 +66,11 @@ func (app *webApp) validate(o any) error {
 
 	return validate.Struct(o)
 }
+
+func (app *webApp) notFound(w http.ResponseWriter, r *http.Request) {
+	app.errorResponse(r, w, http.StatusNotFound, "404 Not Found")
+}
+
+func (app *webApp) methodNotAllowed(w http.ResponseWriter, r *http.Request) {
+	app.errorResponse(r, w, http.StatusMethodNotAllowed, "Method Not Allowed")
+}

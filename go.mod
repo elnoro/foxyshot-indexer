@@ -4,6 +4,8 @@ go 1.20
 
 require (
 	github.com/aws/aws-sdk-go v1.44.136
+	github.com/go-chi/chi/v5 v5.0.8
+	github.com/go-chi/httprate v0.7.1
 	github.com/go-playground/validator/v10 v10.11.1
 	github.com/jackc/pgx v3.6.2+incompatible
 	github.com/jmoiron/sqlx v1.3.5

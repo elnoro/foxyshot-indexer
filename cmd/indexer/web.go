@@ -11,6 +11,9 @@ import (
 
 	"github.com/elnoro/foxyshot-indexer/internal/domain"
 	"github.com/elnoro/foxyshot-indexer/internal/monitoring"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/httprate"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -34,16 +37,28 @@ type webApp struct {
 }
 
 func (app *webApp) routes() http.Handler {
-	mux := http.NewServeMux()
+	r := chi.NewRouter()
 
-	mux.HandleFunc("/healthcheck", app.healthcheckHandler)
-	mux.Handle("/debug/vars", expvar.Handler())
-	mux.Handle("/metrics", promhttp.Handler())
+	r.Use(httprate.LimitByRealIP(10, 10*time.Second))
+	r.Use(middleware.RealIP)
+	r.Use(middleware.Logger)
+	r.Use(middleware.Recoverer)
+	r.Use(middleware.Timeout(60 * time.Second))
 
-	mux.HandleFunc("/api/search", app.searchHandler)
-	mux.HandleFunc("/api/delete", app.deleteHandler)
+	r.Get("/healthcheck", app.healthcheckHandler)
 
-	return mux
+	r.Method(http.MethodGet, "/debug/vars", expvar.Handler())
+	r.Method(http.MethodGet, "/metrics", promhttp.Handler())
+
+	r.Route("/api", func(r chi.Router) {
+		r.Post("/search", app.searchHandler)
+		r.Delete("/delete", app.deleteHandler)
+	})
+
+	r.NotFound(app.notFound)
+	r.MethodNotAllowed(app.methodNotAllowed)
+
+	return r
 }
 
 func (app *webApp) serve(ctx context.Context) error {
