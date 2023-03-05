@@ -16,12 +16,19 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+    logging: &default_logging
+      driver: json-file
+      options:
+        max-size: "1m"
+        max-file: "5"
+        tag: "{{.ImageName}}|{{.Name}}|{{.ImageFullID}}|{{.FullID}}"
 
   migrate:
     image: ghcr.io/elnoro/indexer
     container_name: indexer_migrate
     environment:
       - DB_DSN=postgres://$DBUSER:$DBPASS@db/$DBNAME?sslmode=disable
+    logging: *default_logging
     depends_on:
       db:
         condition: service_healthy
@@ -38,6 +45,7 @@ services:
       POSTGRES_DB: $DBNAME
       PGUSER: $DBUSER
       PGDATABASE: $DBNAME
+    logging: *default_logging
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready" ]
       interval: 5s
