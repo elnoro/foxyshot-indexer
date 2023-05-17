@@ -28,6 +28,9 @@ func (app *webApp) respondNoContent(_ *http.Request, w http.ResponseWriter) {
 }
 
 func (app *webApp) parseJSON(r *http.Request, o any) error {
+	if r.Body == nil {
+		return fmt.Errorf("empty request body")
+	}
 	err := json.NewDecoder(r.Body).Decode(o)
 	if err != nil {
 		return fmt.Errorf("decoding request, %w", err)
