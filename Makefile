@@ -36,6 +36,9 @@ check/test:
 
 check/all: check/mod check/lint check/test
 
+check/dagger:
+	dagger run go run ci/main.go
+
 migrate/run: confirm
 	docker compose -f docker-compose-dev.yml exec app \
 		sh -c 'migrate -database="$${DB_DSN}?sslmode=disable" -path=./migrations up'
