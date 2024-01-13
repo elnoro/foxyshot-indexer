@@ -6,3 +6,9 @@ linters:
     - prealloc
     - unparam
     - bodyclose
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused

@@ -46,13 +46,13 @@ func build(ctx context.Context) error {
 		WithExec([]string{"mod", "verify"}).
 		Stderr(ctx)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("running check/mod, %w", err)
 	}
 	fmt.Println(out)
 
 	// 2. make check/lint
 	golangci := client.Container().
-		From("golangci/golangci-lint:v1.50.1").
+		From("golangci/golangci-lint:v1.55.2-alpine").
 		WithDirectory(
 			"/app",
 			src,
@@ -64,7 +64,7 @@ func build(ctx context.Context) error {
 		WithExec([]string{"golangci-lint", "run", "-v"}).
 		Stderr(ctx)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("running check/lint, %w", err)
 	}
 	fmt.Println(out)
 
@@ -88,7 +88,7 @@ func build(ctx context.Context) error {
 
 	migrations := client.Host().Directory("./migrations")
 	out, err = client.Container().
-		WithServiceBinding("db", postgres).
+		WithServiceBinding("db", postgres.AsService()).
 		From("migrate/migrate:4").
 		WithDirectory("/migrations", migrations).
 		WithEnvVariable("CACHEBUSTER", time.Now().String()).
@@ -97,17 +97,17 @@ func build(ctx context.Context) error {
 		}).
 		Stdout(ctx)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("running migrations, %w", err)
 	}
 	fmt.Println(out)
 
 	// make check/test
 	out, err = runner.
 		// passing postgres container to the test runner
-		WithServiceBinding("db", postgres).
+		WithServiceBinding("db", postgres.AsService()).
 		WithEnvVariable("TEST_DSN", testDSN).
 		// passing minio container to the test runner
-		WithServiceBinding("minio", minio).
+		WithServiceBinding("minio", minio.AsService()).
 		WithEnvVariable("S3_ENDPOINT", "minio:9000").
 		WithEnvVariable("S3_KEY", "minio-access-key").
 		WithEnvVariable("S3_SECRET", "minio-secret-key").
@@ -118,7 +118,7 @@ func build(ctx context.Context) error {
 		WithExec([]string{"test", "-race", "-vet=off", "./..."}).
 		Stderr(ctx)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("running check/test, %w", err)
 	}
 	fmt.Println(out)
 

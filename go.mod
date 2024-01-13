@@ -1,9 +1,11 @@
 module github.com/elnoro/foxyshot-indexer
 
-go 1.20
+go 1.21
+
+toolchain go1.21.6
 
 require (
-	dagger.io/dagger v0.8.4
+	dagger.io/dagger v0.9.6
 	github.com/aws/aws-sdk-go v1.44.136
 	github.com/go-chi/chi/v5 v5.0.8
 	github.com/go-chi/httprate v0.7.1
@@ -38,8 +40,9 @@ require (
 	github.com/shopspring/decimal v1.3.1 // indirect
 	github.com/vektah/gqlparser/v2 v2.5.6 // indirect
 	golang.org/x/crypto v0.1.0 // indirect
-	golang.org/x/sync v0.3.0 // indirect
-	golang.org/x/sys v0.10.0 // indirect
+	golang.org/x/exp v0.0.0-20231006140011-7918f672742d // indirect
+	golang.org/x/sync v0.4.0 // indirect
+	golang.org/x/sys v0.13.0 // indirect
 	golang.org/x/text v0.7.0 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
 )
