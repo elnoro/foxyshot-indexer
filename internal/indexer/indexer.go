@@ -13,7 +13,7 @@ import (
 	"github.com/elnoro/foxyshot-indexer/internal/monitoring"
 )
 
-//go:generate moq -out indexer_moq_test.go . ImageRepo FileStorage OCR
+//go:generate moq -out indexer_moq_test.go . ImageRepo FileStorage OCR CaptionSmith
 type ImageRepo interface {
 	Get(ctx context.Context, fileID string) (domain.Image, error)
 	GetLastModified(ctx context.Context) (time.Time, error)
@@ -29,10 +29,15 @@ type OCR interface {
 	Run(file string) (string, error)
 }
 
+type CaptionSmith interface {
+	Caption(filename string) (string, error)
+}
+
 type Indexer struct {
-	imageRepo ImageRepo
-	storage   FileStorage
-	ocrEngine OCR
+	imageRepo    ImageRepo
+	storage      FileStorage
+	ocrEngine    OCR
+	captionSmith CaptionSmith
 
 	log     *slog.Logger
 	tracker *monitoring.Tracker
@@ -42,15 +47,17 @@ func NewIndexer(
 	imageRepo ImageRepo,
 	storage FileStorage,
 	ocrEngine OCR,
+	captionSmith CaptionSmith,
 	log *slog.Logger,
 	tracker *monitoring.Tracker,
 ) *Indexer {
 	return &Indexer{
-		imageRepo: imageRepo,
-		storage:   storage,
-		ocrEngine: ocrEngine,
-		log:       log.WithGroup("INDEXER"),
-		tracker:   tracker,
+		imageRepo:    imageRepo,
+		storage:      storage,
+		ocrEngine:    ocrEngine,
+		captionSmith: captionSmith,
+		log:          log.WithGroup("INDEXER"),
+		tracker:      tracker,
 	}
 }
 
@@ -103,10 +110,16 @@ func (i *Indexer) Index(file domain.File) error {
 	if err != nil {
 		return fmt.Errorf("cannot download file, %w", err)
 	}
-	desc, err := i.ocrEngine.Run(f.Name())
+	ocrRes, err := i.ocrEngine.Run(f.Name())
 	if err != nil {
 		return fmt.Errorf("running ocr, %w", err)
 	}
+	caption, err := i.captionSmith.Caption(f.Name())
+	if err != nil {
+		return fmt.Errorf("running captioning, %w", err)
+	}
+
+	desc := fmt.Sprintf("OCR:\n%s\nCaption:\n%s", ocrRes, caption)
 
 	img := domain.Image{
 		FileID:       file.Key,

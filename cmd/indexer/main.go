@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/elnoro/foxyshot-indexer/internal/captioning/ollama"
 	"log"
 	"log/slog"
 	"os"
@@ -30,6 +31,7 @@ type Config struct {
 	Ext            string        `validate:"required"`
 	DSN            string        `validate:"required"`
 	S3             S3Config      `validate:"required"`
+	Caption        Caption       `validate:"required"`
 }
 
 type S3Config struct {
@@ -41,6 +43,10 @@ type S3Config struct {
 	Insecure      bool
 	RetryAttempts int
 	RetryDuration time.Duration
+}
+
+type Caption struct {
+	OllamaURL string `validate:"required"`
 }
 
 var version = "development"
@@ -63,6 +69,9 @@ func main() {
 
 	flag.IntVar(&cfg.S3.RetryAttempts, "s3.attempts", 0, "how many times to check s3 connectivity during startup")
 	flag.DurationVar(&cfg.S3.RetryDuration, "s3.retry", 15*time.Second, "retry duration between attempts")
+
+	flag.StringVar(&cfg.Caption.OllamaURL, "caption.ollamaUrl", os.Getenv("OLLAMA_URL"), "url pointing to ollama API")
+
 	flag.Parse()
 
 	err := validateConfig(cfg)
@@ -96,6 +105,11 @@ func main() {
 		log.Fatal(err)
 	}
 
+	ollamaClient, err := ollama.NewClient(cfg.Caption.OllamaURL, logger)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	tracker := monitoring.NewTracker()
 	err = tracker.Register()
 	if err != nil {
@@ -115,7 +129,7 @@ func main() {
 
 	imgRepo := dbadapter.NewImageRepo(db)
 
-	idxr := indexer.NewIndexer(imgRepo, storage, ocrEngine, logger, tracker)
+	idxr := indexer.NewIndexer(imgRepo, storage, ocrEngine, ollamaClient, logger, tracker)
 	runner := app.NewIndexRunner(idxr, cfg.Ext, cfg.ScrapeInterval, logger)
 
 	ctx, cancel := context.WithCancel(context.Background())

@@ -13,6 +13,7 @@ services:
       - S3_PUBLIC
       - DB_DSN=postgres://$DBUSER:$DBPASS@db/$DBNAME
       - TEST_DSN=postgres://$DBUSER:$DBPASS@db/$DBNAME
+      - OLLAMA_URL
     volumes:
       - .:/app
     ports:

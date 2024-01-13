@@ -358,3 +358,69 @@ func (mock *OCRMock) RunCalls() []struct {
 	mock.lockRun.RUnlock()
 	return calls
 }
+
+// Ensure, that CaptionSmithMock does implement CaptionSmith.
+// If this is not the case, regenerate this file with moq.
+var _ CaptionSmith = &CaptionSmithMock{}
+
+// CaptionSmithMock is a mock implementation of CaptionSmith.
+//
+//	func TestSomethingThatUsesCaptionSmith(t *testing.T) {
+//
+//		// make and configure a mocked CaptionSmith
+//		mockedCaptionSmith := &CaptionSmithMock{
+//			CaptionFunc: func(filename string) (string, error) {
+//				panic("mock out the Caption method")
+//			},
+//		}
+//
+//		// use mockedCaptionSmith in code that requires CaptionSmith
+//		// and then make assertions.
+//
+//	}
+type CaptionSmithMock struct {
+	// CaptionFunc mocks the Caption method.
+	CaptionFunc func(filename string) (string, error)
+
+	// calls tracks calls to the methods.
+	calls struct {
+		// Caption holds details about calls to the Caption method.
+		Caption []struct {
+			// Filename is the filename argument value.
+			Filename string
+		}
+	}
+	lockCaption sync.RWMutex
+}
+
+// Caption calls CaptionFunc.
+func (mock *CaptionSmithMock) Caption(filename string) (string, error) {
+	if mock.CaptionFunc == nil {
+		panic("CaptionSmithMock.CaptionFunc: method is nil but CaptionSmith.Caption was just called")
+	}
+	callInfo := struct {
+		Filename string
+	}{
+		Filename: filename,
+	}
+	mock.lockCaption.Lock()
+	mock.calls.Caption = append(mock.calls.Caption, callInfo)
+	mock.lockCaption.Unlock()
+	return mock.CaptionFunc(filename)
+}
+
+// CaptionCalls gets all the calls that were made to Caption.
+// Check the length with:
+//
+//	len(mockedCaptionSmith.CaptionCalls())
+func (mock *CaptionSmithMock) CaptionCalls() []struct {
+	Filename string
+} {
+	var calls []struct {
+		Filename string
+	}
+	mock.lockCaption.RLock()
+	calls = mock.calls.Caption
+	mock.lockCaption.RUnlock()
+	return calls
+}

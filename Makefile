@@ -13,7 +13,8 @@ compose/dev/rebuild-image:
 compose/dev/up:
 	docker compose -f docker-compose-dev.yml up -d
 
-	@echo "Open http://localhost:8080/healthcheck"
+	@echo "API http://localhost:8080/healthcheck"
+	@echo "Minio http://localhost:9001/"
 .PHONY: compose/dev/up
 
 compose/dev/down:

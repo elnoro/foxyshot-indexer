@@ -23,15 +23,17 @@ func TestIndexer_Index(t *testing.T) {
 	}
 	const testImg = "./testdata/expected-downloaded-image"
 	const testOCRResult = "expected-ocr-results"
+	const testCaptionResults = "expected-caption-results"
 
 	repo := &ImageRepoMock{UpsertFunc: func(ctx context.Context, image domain.Image) error { return nil }}
 	storage := &FileStorageMock{DownloadFunc: func(key string) (*os.File, error) { return os.Create(testImg) }}
 	ocr := &OCRMock{RunFunc: func(file string) (string, error) { return testOCRResult, nil }}
+	capSmith := &CaptionSmithMock{CaptionFunc: func(filename string) (string, error) { return testCaptionResults, nil }}
 	logger := slog.Default()
 	tracker := monitoring.NewTracker()
 
 	t.Run("successful run", func(t *testing.T) {
-		indexer := NewIndexer(repo, storage, ocr, logger, tracker)
+		indexer := NewIndexer(repo, storage, ocr, capSmith, logger, tracker)
 		err := indexer.Index(testFile)
 		tt.NoErr(err)
 
@@ -39,7 +41,7 @@ func TestIndexer_Index(t *testing.T) {
 		tt.Equal(ocr.RunCalls()[0].File, testImg)
 		tt.Equal(repo.UpsertCalls()[0].Image, domain.Image{
 			FileID:       testFile.Key,
-			Description:  testOCRResult,
+			Description:  "OCR:\n" + testOCRResult + "\nCaption:\n" + testCaptionResults,
 			LastModified: testFile.LastModified,
 		})
 
@@ -53,7 +55,7 @@ func TestIndexer_Index(t *testing.T) {
 		expectedErr := errors.New("expected err")
 		repo := &ImageRepoMock{UpsertFunc: func(ctx context.Context, image domain.Image) error { return expectedErr }}
 
-		indexer := NewIndexer(repo, storage, ocr, logger, tracker)
+		indexer := NewIndexer(repo, storage, ocr, capSmith, logger, tracker)
 		err := indexer.Index(testFile)
 
 		tt.True(errors.Is(err, expectedErr))
@@ -63,7 +65,7 @@ func TestIndexer_Index(t *testing.T) {
 		expectedErr := errors.New("expected err")
 		storage := &FileStorageMock{DownloadFunc: func(key string) (*os.File, error) { return nil, expectedErr }}
 
-		indexer := NewIndexer(repo, storage, ocr, logger, tracker)
+		indexer := NewIndexer(repo, storage, ocr, capSmith, logger, tracker)
 		err := indexer.Index(testFile)
 
 		tt.True(errors.Is(err, expectedErr))
@@ -73,7 +75,7 @@ func TestIndexer_Index(t *testing.T) {
 		expectedErr := errors.New("expected err")
 		ocr := &OCRMock{RunFunc: func(file string) (string, error) { return "", expectedErr }}
 
-		indexer := NewIndexer(repo, storage, ocr, logger, tracker)
+		indexer := NewIndexer(repo, storage, ocr, capSmith, logger, tracker)
 		err := indexer.Index(testFile)
 
 		tt.True(errors.Is(err, expectedErr))
@@ -87,7 +89,7 @@ func TestIndexer_Index(t *testing.T) {
 			return f, nil
 		}}
 
-		indexer := NewIndexer(repo, storage, ocr, logger, tracker)
+		indexer := NewIndexer(repo, storage, ocr, capSmith, logger, tracker)
 		err := indexer.Index(testFile)
 
 		tt.NoErr(err)
@@ -128,9 +130,10 @@ func TestIndexer_IndexNewList(t *testing.T) {
 		},
 	}
 	ocr := &OCRMock{RunFunc: func(file string) (string, error) { return testOCRResult, nil }}
+	capSmith := &CaptionSmithMock{CaptionFunc: func(filename string) (string, error) { return "", nil }}
 
 	t.Run("successful run", func(t *testing.T) {
-		indexer := NewIndexer(repo, storage, ocr, logger, tracker)
+		indexer := NewIndexer(repo, storage, ocr, capSmith, logger, tracker)
 		err := indexer.IndexNewList(ctx, "expected-pattern")
 
 		tt.NoErr(err)
@@ -144,7 +147,7 @@ func TestIndexer_IndexNewList(t *testing.T) {
 		repo := &ImageRepoMock{GetLastModifiedFunc: func(_ context.Context) (time.Time, error) {
 			return time.Time{}, expectedErr
 		}}
-		indexer := NewIndexer(repo, storage, ocr, logger, tracker)
+		indexer := NewIndexer(repo, storage, ocr, capSmith, logger, tracker)
 
 		err := indexer.IndexNewList(ctx, "expected-pattern")
 
@@ -157,7 +160,7 @@ func TestIndexer_IndexNewList(t *testing.T) {
 				return nil, expectedErr
 			},
 		}
-		indexer := NewIndexer(repo, storage, ocr, logger, tracker)
+		indexer := NewIndexer(repo, storage, ocr, capSmith, logger, tracker)
 
 		err := indexer.IndexNewList(ctx, "expected-pattern")
 
@@ -171,7 +174,7 @@ func TestIndexer_IndexNewList(t *testing.T) {
 				return []domain.File{{Key: expectedKey}, {Key: "invalid-key"}}, nil
 			},
 		}
-		indexer := NewIndexer(repo, storage, ocr, logger, tracker)
+		indexer := NewIndexer(repo, storage, ocr, capSmith, logger, tracker)
 
 		err := indexer.IndexNewList(ctx, "expected-pattern")
 
@@ -193,7 +196,7 @@ func TestIndexer_IndexNewList(t *testing.T) {
 			},
 			GetFunc: func(_ context.Context, fileID string) (domain.Image, error) { return domain.Image{}, nil },
 		}
-		indexer := NewIndexer(repo, storage, ocr, logger, tracker)
+		indexer := NewIndexer(repo, storage, ocr, capSmith, logger, tracker)
 
 		err := indexer.IndexNewList(ctx, "expected-pattern")
 

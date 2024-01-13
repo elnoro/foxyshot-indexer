@@ -111,7 +111,7 @@ func (c *BucketClient) ListFiles(start time.Time, ext string) ([]domain.File, er
 		files = append(files, domain.File{Key: *object.Key, LastModified: *object.LastModified})
 	}
 
-	c.log.Info("prepared list of files for processing", slog.Int("numFiles", len(files)))
+	c.log.Info("prepared files for processing", slog.Int("numFiles", len(files)))
 
 	return files, nil
 }
