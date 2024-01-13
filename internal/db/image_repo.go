@@ -36,23 +36,81 @@ func (i *ImageRepo) Upsert(ctx context.Context, image domain.Image) error {
 	return nil
 }
 
-func (i *ImageRepo) Search(ctx context.Context, searchString string, page, perPage int) ([]domain.Image, error) {
+func (i *ImageRepo) FindByDescription(
+	ctx context.Context,
+	searchString string,
+	page,
+	perPage int,
+) ([]domain.Image, error) {
+	if perPage <= 0 {
+		return []domain.Image{}, nil
+	}
+
+	images, err := i.fullTextSearch(ctx, searchString, page, perPage)
+	if err != nil {
+		return []domain.Image{}, fmt.Errorf("full text search err, %w", err)
+	}
+
+	if len(images) > 0 {
+		return images, nil
+	}
+
+	images, err = i.patternMatching(ctx, searchString, page, perPage)
+	if err != nil {
+		return []domain.Image{}, fmt.Errorf("pattern matching err, %w", err)
+	}
+
+	return images, nil
+}
+
+func (i *ImageRepo) fullTextSearch(
+	ctx context.Context,
+	searchString string,
+	page,
+	perPage int,
+) ([]domain.Image, error) {
 	pattern := "%" + searchString + "%"
 	limit := perPage
 	offset := (page - 1) * perPage
 
-	imgs := []domain.Image{}
+	images := make([]domain.Image, 0)
+
 	query := `SELECT file_id, description, last_modified 
 		FROM image_descriptions 
 		WHERE (to_tsvector('simple', description) @@ plainto_tsquery('simple', $1) OR $1 = '')
 		ORDER BY last_modified desc LIMIT $2 OFFSET $3`
 	args := []any{pattern, limit, offset}
-	err := i.db.SelectContext(ctx, &imgs, query, args...)
+	err := i.db.SelectContext(ctx, &images, query, args...)
 	if err != nil {
-		return imgs, fmt.Errorf("searching for images with query %s, %w", query, err)
+		return images, fmt.Errorf("searching for images with query %s, %w", query, err)
 	}
 
-	return imgs, nil
+	return images, nil
+}
+
+func (i *ImageRepo) patternMatching(
+	ctx context.Context,
+	searchString string,
+	page,
+	perPage int,
+) ([]domain.Image, error) {
+	pattern := "%" + searchString + "%"
+	limit := perPage
+	offset := (page - 1) * perPage
+
+	images := make([]domain.Image, 0)
+
+	query := `SELECT file_id, description, last_modified 
+		FROM image_descriptions 
+		WHERE description ILIKE $1
+		ORDER BY last_modified desc LIMIT $2 OFFSET $3`
+	args := []any{pattern, limit, offset}
+	err := i.db.SelectContext(ctx, &images, query, args...)
+	if err != nil {
+		return images, fmt.Errorf("searching for images with query %s, %w", query, err)
+	}
+
+	return images, nil
 }
 
 func (i *ImageRepo) Delete(ctx context.Context, fileID string) error {

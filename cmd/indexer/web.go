@@ -17,8 +17,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
+//go:generate moq -out web_moq_test.go . imageRepo fileStorage
 type imageRepo interface {
-	Search(ctx context.Context, searchString string, page, perPage int) ([]domain.Image, error)
+	FindByDescription(ctx context.Context, searchString string, page, perPage int) ([]domain.Image, error)
 	Delete(ctx context.Context, fileID string) error
 }
 

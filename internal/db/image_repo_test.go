@@ -131,7 +131,7 @@ func TestImageRepo(t *testing.T) {
 		tt.Equal(want, got)
 	})
 
-	t.Run("Search returns images with descriptions matching search string", func(t *testing.T) {
+	t.Run("FindByDescription returns images with descriptions matching search string", func(t *testing.T) {
 		tt := is.New(t)
 
 		err := repo.Upsert(ctx, domain.Image{
@@ -146,28 +146,44 @@ func TestImageRepo(t *testing.T) {
 		})
 		tt.NoErr(err)
 
-		images, err := repo.Search(ctx, "find me", 1, 100)
+		images, err := repo.FindByDescription(ctx, "find me", 1, 100)
 		tt.NoErr(err)
 
 		tt.Equal(1, len(images))
 		tt.Equal("expected-found-id", images[0].FileID)
 	})
 
-	t.Run("Search returns error if there is an error in the query", func(t *testing.T) {
+	t.Run("FindByDescription returns error if there is an error in the query", func(t *testing.T) {
 		tt := is.New(t)
 
 		ctx, cancel := context.WithCancel(ctx)
 		cancel()
 
-		images, err := repo.Search(ctx, "find me", 1, 100)
+		images, err := repo.FindByDescription(ctx, "find me", 1, 100)
 		tt.Equal(0, len(images))
 		tt.True(errors.Is(err, context.Canceled))
 	})
 
-	t.Run("Search returns empty slice if there is nothing to be found", func(t *testing.T) {
+	t.Run("FindByDescription uses pattern matching if full text fails", func(t *testing.T) {
 		tt := is.New(t)
 
-		images, err := repo.Search(ctx, "skipme", 1, 100)
+		err := repo.Upsert(ctx, domain.Image{
+			FileID:      "expected-found-id",
+			Description: "complicatedstring",
+		})
+		tt.NoErr(err)
+
+		images, err := repo.FindByDescription(ctx, "catedstring", 1, 100)
+		tt.NoErr(err)
+
+		tt.Equal(1, len(images))
+		tt.Equal("expected-found-id", images[0].FileID)
+	})
+
+	t.Run("FindByDescription returns empty slice if there is nothing to be found", func(t *testing.T) {
+		tt := is.New(t)
+
+		images, err := repo.FindByDescription(ctx, "skipme", 1, 100)
 		tt.Equal([]domain.Image{}, images)
 		tt.NoErr(err)
 	})
