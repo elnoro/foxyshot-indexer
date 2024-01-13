@@ -26,3 +26,7 @@ To run linters and tests, run:
 ```
 $ make check/all
 ```
+To start the CI pipeline locally, run:
+```
+$ make check/dagger
+```
