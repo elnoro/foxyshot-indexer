@@ -3,6 +3,7 @@ package s3wrapper
 import (
 	"errors"
 	"io"
+	"log/slog"
 	"os"
 	"testing"
 	"time"
@@ -21,11 +22,12 @@ func TestBucketClient_Download(t *testing.T) {
 		},
 	}
 	c := &clientMock{}
+	l := slog.Default()
 
 	t.Run("successful downloading", func(t *testing.T) {
 		tt := is.New(t)
 
-		bc := NewClient(c, d, "expected-bucket", "expected-prefix")
+		bc := NewClient(c, d, l, "expected-bucket", "expected-prefix")
 
 		f, err := bc.Download("expected-key")
 		tt.True(f != nil) // temp file with downloaded content must be created
@@ -41,7 +43,7 @@ func TestBucketClient_Download(t *testing.T) {
 	t.Run("file error", func(t *testing.T) {
 		tt := is.New(t)
 
-		bc := NewClient(c, d, "expected-bucket", "expected/prefix")
+		bc := NewClient(c, d, l, "expected-bucket", "expected/prefix")
 
 		f, err := bc.Download("expected-key")
 		tt.True(f == nil) // temp file with downloaded content must be created
@@ -57,7 +59,7 @@ func TestBucketClient_Download(t *testing.T) {
 				return 0, expectedErr
 			},
 		}
-		bc := NewClient(c, d, "expected-bucket", "expected-prefix")
+		bc := NewClient(c, d, l, "expected-bucket", "expected-prefix")
 
 		f, err := bc.Download("expected-key")
 		tt.True(f != nil)                    // temp file with downloaded content must be created
@@ -78,10 +80,12 @@ func TestBucketClient_ListFiles(t *testing.T) {
 		},
 	}
 
+	l := slog.Default()
+
 	t.Run("filters out files with wrong extension and before start time", func(t *testing.T) {
 		tt := is.New(t)
 
-		bc := NewClient(c, d, "expected-bucket", "expected-prefix")
+		bc := NewClient(c, d, l, "expected-bucket", "expected-prefix")
 
 		files, err := bc.ListFiles(time.Unix(99, 0), "-key")
 		tt.NoErr(err)
@@ -100,7 +104,7 @@ func TestBucketClient_ListFiles(t *testing.T) {
 				return nil, expectedErr
 			},
 		}
-		bc := NewClient(c, d, "expected-bucket", "expected-prefix")
+		bc := NewClient(c, d, l, "expected-bucket", "expected-prefix")
 
 		files, err := bc.ListFiles(time.Unix(99, 0), "-key")
 

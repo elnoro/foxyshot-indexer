@@ -2,6 +2,7 @@ package s3wrapper
 
 import (
 	"errors"
+	"log/slog"
 	"os"
 	"strings"
 	"testing"
@@ -21,7 +22,7 @@ func TestNewClientFromSecrets_SessionError(t *testing.T) {
 	err := os.Setenv(stsEndpoint, "invalid-sts-value")
 	tt.NoErr(err)
 
-	v, err := NewFromSecrets("", "", "", "", "", false)
+	v, err := NewFromSecrets("", "", "", "", "", false, slog.Default())
 
 	tt.True(v == nil)
 	tt.True(strings.Contains(err.Error(), "invalid-sts-value")) // must return an error because of invalid env var
@@ -54,6 +55,7 @@ func TestBucketClient_CheckConnectivity(t *testing.T) {
 			"eu-west-1",
 			os.Getenv("S3_BUCKET"),
 			true,
+			slog.Default(),
 		)
 		tt.NoErr(err)
 
@@ -74,6 +76,7 @@ func validClient(t *testing.T) *BucketClient {
 		"eu-west-1",
 		os.Getenv("S3_BUCKET"),
 		true,
+		slog.Default(),
 	)
 
 	if err != nil {

@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"time"
 
@@ -34,6 +34,7 @@ type Indexer struct {
 	storage   FileStorage
 	ocrEngine OCR
 
+	log     *slog.Logger
 	tracker *monitoring.Tracker
 }
 
@@ -41,9 +42,16 @@ func NewIndexer(
 	imageRepo ImageRepo,
 	storage FileStorage,
 	ocrEngine OCR,
+	log *slog.Logger,
 	tracker *monitoring.Tracker,
 ) *Indexer {
-	return &Indexer{imageRepo: imageRepo, storage: storage, ocrEngine: ocrEngine, tracker: tracker}
+	return &Indexer{
+		imageRepo: imageRepo,
+		storage:   storage,
+		ocrEngine: ocrEngine,
+		log:       log.WithGroup("INDEXER"),
+		tracker:   tracker,
+	}
 }
 
 func (i *Indexer) IndexNewList(ctx context.Context, pattern string) error {
@@ -59,19 +67,19 @@ func (i *Indexer) IndexNewList(ctx context.Context, pattern string) error {
 	for _, file := range files {
 		_, err := i.imageRepo.Get(ctx, file.Key)
 		if err != nil && !errors.Is(err, dbadapter.ErrRecordNotFound) {
-			log.Println("ERROR: failed to check:", err)
+			i.log.Error("getting image from the database", slog.String("err", err.Error()))
 			continue
 		}
 		if nil == err {
-			log.Printf("INFO: %s already processed, skipping\n", file.Key)
+			i.log.Info("skipping, file already processed", slog.String("file", file.Key))
 			continue
 		}
 
 		err = i.Index(file)
 		if err != nil {
-			log.Println("ERROR: failed to index:", err)
+			i.log.Error("indexing file", slog.String("err", err.Error()))
 		} else {
-			log.Println("INFO: added", file)
+			i.log.Info("file processed", slog.String("file", file.Key))
 			i.tracker.OnIndex()
 		}
 	}
@@ -85,7 +93,10 @@ func (i *Indexer) Index(file domain.File) error {
 		defer func(name string) {
 			err := os.Remove(name)
 			if err != nil {
-				log.Println("ERROR: removing temp file,", err)
+				i.log.Error("removing temp file",
+					slog.String("file", name),
+					slog.String("err", err.Error()),
+				)
 			}
 		}(f.Name())
 	}

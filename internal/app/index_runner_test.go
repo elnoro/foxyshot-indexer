@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"testing"
 	"time"
 
@@ -13,10 +14,11 @@ func TestIndexRunner_Start_NoError(t *testing.T) {
 	tt := is.New(t)
 
 	li := &listIndexerMock{IndexNewListFunc: func(_ context.Context, _ string) error { return nil }}
+	l := slog.Default()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
 	defer cancel()
-	runner := NewIndexRunner(li, "expected-ext", 100*time.Millisecond)
+	runner := NewIndexRunner(li, "expected-ext", 100*time.Millisecond, l)
 
 	err := runner.Start(ctx)
 
@@ -30,10 +32,11 @@ func TestIndexRunner_Start_Error(t *testing.T) {
 
 	expectedErr := errors.New("expected-err")
 	li := &listIndexerMock{IndexNewListFunc: func(_ context.Context, _ string) error { return expectedErr }}
+	l := slog.Default()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
 	defer cancel()
-	runner := NewIndexRunner(li, "expected-ext", 100*time.Millisecond)
+	runner := NewIndexRunner(li, "expected-ext", 100*time.Millisecond, l)
 
 	err := runner.Start(ctx)
 

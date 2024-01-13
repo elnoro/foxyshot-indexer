@@ -3,7 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 )
 
@@ -14,17 +14,18 @@ type listIndexer interface {
 
 type IndexRunner struct {
 	indexer listIndexer
+	log     *slog.Logger
 
 	ext      string
 	interval time.Duration
 }
 
-func NewIndexRunner(indexer listIndexer, ext string, interval time.Duration) *IndexRunner {
-	return &IndexRunner{indexer: indexer, ext: ext, interval: interval}
+func NewIndexRunner(indexer listIndexer, ext string, interval time.Duration, log *slog.Logger) *IndexRunner {
+	return &IndexRunner{indexer: indexer, ext: ext, interval: interval, log: log}
 }
 
 func (i *IndexRunner) Start(ctx context.Context) error {
-	log.Println("INFO: running indexer")
+	i.log.Info("starting indexer")
 	timer := time.NewTimer(0) // starting immediately
 	for {
 		select {

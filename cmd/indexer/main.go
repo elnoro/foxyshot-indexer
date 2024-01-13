@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"sync"
@@ -69,6 +70,8 @@ func main() {
 		log.Fatal(err)
 	}
 
+	logger := slog.Default()
+
 	storage, err := s3wrapper.NewFromSecrets(
 		cfg.S3.Key,
 		cfg.S3.Secret,
@@ -76,6 +79,7 @@ func main() {
 		cfg.S3.Region,
 		cfg.S3.Bucket,
 		cfg.S3.Insecure,
+		logger,
 	)
 	if err != nil {
 		log.Fatal(err)
@@ -111,8 +115,8 @@ func main() {
 
 	imgRepo := dbadapter.NewImageRepo(db)
 
-	idxr := indexer.NewIndexer(imgRepo, storage, ocrEngine, tracker)
-	runner := app.NewIndexRunner(idxr, cfg.Ext, cfg.ScrapeInterval)
+	idxr := indexer.NewIndexer(imgRepo, storage, ocrEngine, logger, tracker)
+	runner := app.NewIndexRunner(idxr, cfg.Ext, cfg.ScrapeInterval, logger)
 
 	ctx, cancel := context.WithCancel(context.Background())
 

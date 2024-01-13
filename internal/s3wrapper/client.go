@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"os"
 	"strings"
 	"time"
@@ -34,6 +34,7 @@ type client interface {
 type BucketClient struct {
 	client     client
 	downloader downloader
+	log        *slog.Logger
 
 	bucket         string
 	tempFilePrefix string
@@ -41,11 +42,20 @@ type BucketClient struct {
 
 var ErrNoAttempts = errors.New("invalid number of attempts, must be > 0")
 
-func NewClient(c client, d downloader, bucket, tempFilePrefix string) *BucketClient {
-	return &BucketClient{client: c, downloader: d, bucket: bucket, tempFilePrefix: tempFilePrefix}
+func NewClient(c client, d downloader, l *slog.Logger, bucket, tempFilePrefix string) *BucketClient {
+	return &BucketClient{
+		client:         c,
+		downloader:     d,
+		log:            l.WithGroup("S3"),
+		bucket:         bucket,
+		tempFilePrefix: tempFilePrefix,
+	}
 }
 
-func NewFromSecrets(key, secret, endpoint, region, bucket string, insecure bool) (*BucketClient, error) {
+func NewFromSecrets(
+	key, secret, endpoint, region, bucket string, insecure bool,
+	logger *slog.Logger,
+) (*BucketClient, error) {
 	s3Config := &aws.Config{
 		S3ForcePathStyle: aws.Bool(true),
 		Credentials:      credentials.NewStaticCredentials(key, secret, ""),
@@ -61,7 +71,7 @@ func NewFromSecrets(key, secret, endpoint, region, bucket string, insecure bool)
 	s3Client := s3.New(sess)
 	s3Downloader := s3manager.NewDownloader(sess)
 
-	return NewClient(s3Client, s3Downloader, bucket, tempFilePrefix), nil
+	return NewClient(s3Client, s3Downloader, logger, bucket, tempFilePrefix), nil
 }
 
 func (c *BucketClient) CheckConnectivity(attempts int, dur time.Duration) error {
@@ -82,12 +92,12 @@ func (c *BucketClient) CheckConnectivity(attempts int, dur time.Duration) error 
 }
 
 func (c *BucketClient) ListFiles(start time.Time, ext string) ([]domain.File, error) {
-	log.Println("[s3] listing objects with ext", ext, "starting from", start)
+	c.log.Info("listing objects with ext", slog.String("ext", ext), slog.Time("from", start))
 	listObjsResponse, err := c.client.ListObjectsV2(&s3.ListObjectsV2Input{Bucket: aws.String(c.bucket)})
 	if err != nil {
 		return nil, fmt.Errorf("listing objects from bucket %s, %w", c.bucket, err)
 	}
-	log.Println("[s3] received", len(listObjsResponse.Contents), "objects")
+	c.log.Info("received", slog.Int("numOjbects", len(listObjsResponse.Contents)))
 
 	var files []domain.File //nolint:prealloc
 	for _, object := range listObjsResponse.Contents {
@@ -101,7 +111,7 @@ func (c *BucketClient) ListFiles(start time.Time, ext string) ([]domain.File, er
 		files = append(files, domain.File{Key: *object.Key, LastModified: *object.LastModified})
 	}
 
-	log.Println("[s3]", len(files), "files to process")
+	c.log.Info("prepared list of files for processing", slog.Int("numFiles", len(files)))
 
 	return files, nil
 }
