@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/elnoro/foxyshot-indexer/internal/captioning"
 	"github.com/elnoro/foxyshot-indexer/internal/captioning/ollama"
 	"log"
 	"log/slog"
@@ -46,7 +47,7 @@ type S3Config struct {
 }
 
 type Caption struct {
-	OllamaURL string `validate:"required"`
+	OllamaURL string
 }
 
 var version = "development"
@@ -105,10 +106,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	ollamaClient, err := ollama.NewClient(cfg.Caption.OllamaURL, logger)
-	if err != nil {
-		log.Fatal(err)
-	}
+	captionSmith := buildCaptionSmith(cfg, logger)
 
 	tracker := monitoring.NewTracker()
 	err = tracker.Register()
@@ -129,7 +127,7 @@ func main() {
 
 	imgRepo := dbadapter.NewImageRepo(db)
 
-	idxr := indexer.NewIndexer(imgRepo, storage, ocrEngine, ollamaClient, logger, tracker)
+	idxr := indexer.NewIndexer(imgRepo, storage, ocrEngine, captionSmith, logger, tracker)
 	runner := app.NewIndexRunner(idxr, cfg.Ext, cfg.ScrapeInterval, logger)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -176,4 +174,17 @@ func main() {
 func validateConfig(cfg Config) error {
 	validate := validator.New()
 	return validate.Struct(cfg)
+}
+
+func buildCaptionSmith(cfg Config, l *slog.Logger) indexer.CaptionSmith {
+	if cfg.Caption.OllamaURL == "" {
+		return captioning.NewDummy("")
+	}
+
+	ollamaClient, err := ollama.NewClient(cfg.Caption.OllamaURL, l)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return ollamaClient
 }
