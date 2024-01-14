@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/elnoro/foxyshot-indexer/internal/captioning"
 	"github.com/elnoro/foxyshot-indexer/internal/captioning/ollama"
+	"github.com/elnoro/foxyshot-indexer/internal/embedding"
 	"log"
 	"log/slog"
 	"os"
@@ -33,6 +34,7 @@ type Config struct {
 	DSN            string        `validate:"required"`
 	S3             S3Config      `validate:"required"`
 	Caption        Caption       `validate:"required"`
+	EmbeddingsURL  string        `validate:"required"`
 }
 
 type S3Config struct {
@@ -72,6 +74,7 @@ func main() {
 	flag.DurationVar(&cfg.S3.RetryDuration, "s3.retry", 15*time.Second, "retry duration between attempts")
 
 	flag.StringVar(&cfg.Caption.OllamaURL, "caption.ollamaUrl", os.Getenv("OLLAMA_URL"), "url pointing to ollama API")
+	flag.StringVar(&cfg.EmbeddingsURL, "embeddings.url", "http://embeddings:8000", "url pointing to embeddings API")
 
 	flag.Parse()
 
@@ -108,6 +111,8 @@ func main() {
 
 	captionSmith := buildCaptionSmith(cfg, logger)
 
+	embeddingsClient := embedding.NewClient(cfg.EmbeddingsURL, logger)
+
 	tracker := monitoring.NewTracker()
 	err = tracker.Register()
 	if err != nil {
@@ -127,7 +132,7 @@ func main() {
 
 	imgRepo := dbadapter.NewImageRepo(db)
 
-	idxr := indexer.NewIndexer(imgRepo, storage, ocrEngine, captionSmith, logger, tracker)
+	idxr := indexer.NewIndexer(imgRepo, storage, ocrEngine, captionSmith, embeddingsClient, logger, tracker)
 	runner := app.NewIndexRunner(idxr, cfg.Ext, cfg.ScrapeInterval, logger)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -139,6 +144,7 @@ func main() {
 		log:    log.Default(),
 
 		imageDescriptions: imgRepo,
+		embeddings:        embeddingsClient,
 		fileStorage:       storage,
 		tracker:           tracker,
 	}

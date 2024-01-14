@@ -33,11 +33,17 @@ type CaptionSmith interface {
 	Caption(filename string) (string, error)
 }
 
+type ImageEmbeddingClient interface {
+	CreateEmbeddingForFile(filePath string) (domain.Embedding, error)
+	CreateEmbeddingFromBase64(data string) (domain.Embedding, error)
+}
+
 type Indexer struct {
-	imageRepo    ImageRepo
-	storage      FileStorage
-	ocrEngine    OCR
-	captionSmith CaptionSmith
+	imageRepo       ImageRepo
+	storage         FileStorage
+	ocrEngine       OCR
+	captionSmith    CaptionSmith
+	embeddingClient ImageEmbeddingClient
 
 	log     *slog.Logger
 	tracker *monitoring.Tracker
@@ -48,16 +54,18 @@ func NewIndexer(
 	storage FileStorage,
 	ocrEngine OCR,
 	captionSmith CaptionSmith,
+	embeddingClient ImageEmbeddingClient,
 	log *slog.Logger,
 	tracker *monitoring.Tracker,
 ) *Indexer {
 	return &Indexer{
-		imageRepo:    imageRepo,
-		storage:      storage,
-		ocrEngine:    ocrEngine,
-		captionSmith: captionSmith,
-		log:          log.WithGroup("INDEXER"),
-		tracker:      tracker,
+		imageRepo:       imageRepo,
+		storage:         storage,
+		ocrEngine:       ocrEngine,
+		captionSmith:    captionSmith,
+		embeddingClient: embeddingClient,
+		log:             log.WithGroup("INDEXER"),
+		tracker:         tracker,
 	}
 }
 
@@ -121,10 +129,16 @@ func (i *Indexer) Index(file domain.File) error {
 
 	desc := fmt.Sprintf("OCR:\n%s\nCaption:\n%s", ocrRes, caption)
 
+	imageEmbedding, err := i.embeddingClient.CreateEmbeddingForFile(f.Name())
+	if err != nil {
+		return fmt.Errorf("creating embedding, %w", err)
+	}
+
 	img := domain.Image{
 		FileID:       file.Key,
 		LastModified: file.LastModified,
 		Description:  desc,
+		Embedding:    imageEmbedding,
 	}
 
 	err = i.imageRepo.Upsert(context.TODO(), img)

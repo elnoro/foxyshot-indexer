@@ -45,7 +45,8 @@ services:
     entrypoint: sh -c 'migrate -database="$${DB_DSN}" -path=./migrations up'
 
   db:
-    image: postgres:15
+    build:
+      dockerfile: ./docker/postgres/Dockerfile
     restart: always
     volumes:
       - db-data:/var/lib/postgresql/data
@@ -76,6 +77,13 @@ services:
       - MINIO_ROOT_PASSWORD=$S3_SECRET
       - MINIO_DEFAULT_BUCKETS=$S3_BUCKET:public
     logging: *default_logging
+
+  embeddings:
+    image: ghcr.io/elnoro/clip-embeddings-api:v2
+    ports:
+      - "8000:8000"
+    logging: *default_logging
+
 volumes:
   db-data:
     driver: local

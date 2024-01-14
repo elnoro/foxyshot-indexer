@@ -33,3 +33,37 @@ func (app *webApp) searchHandler(w http.ResponseWriter, r *http.Request) {
 
 	app.respondJSON(r, w, http.StatusOK, images)
 }
+
+func (app *webApp) imageSearchHandler(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		SearchFile string `json:"search_file" validate:"required"`
+		Page       int    `json:"page" validate:"min=1"`
+		PerPage    int    `json:"per_page" validate:"min=1,max=100"`
+	}
+	err := app.parseJSON(r, &req)
+	if err != nil {
+		app.malformedJSON(r, w)
+		return
+	}
+
+	err = app.validate(req)
+	if err != nil {
+		app.validationError(r, w, err)
+		return
+	}
+
+	embedding, err := app.embeddings.CreateEmbeddingFromBase64(req.SearchFile)
+	if err != nil {
+		app.serverError(r, w, err)
+	}
+
+	ctx := context.Background()
+	images, err := app.imageDescriptions.FindByEmbedding(ctx, embedding, req.Page, req.PerPage)
+	if err != nil {
+		app.serverError(r, w, err)
+		return
+	}
+	app.tracker.OnSearch()
+
+	app.respondJSON(r, w, http.StatusOK, images)
+}
