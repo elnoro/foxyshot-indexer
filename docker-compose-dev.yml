@@ -23,6 +23,8 @@ services:
         condition: service_completed_successfully
       minio:
         condition: service_started
+      embeddings:
+        condition: service_started
     logging: &default_logging
       driver: json-file
       options:
@@ -79,7 +81,7 @@ services:
     logging: *default_logging
 
   embeddings:
-    image: ghcr.io/elnoro/clip-embeddings-api:v2
+    image: ghcr.io/elnoro/clip-embeddings-api:v0-slim
     ports:
       - "8000:8000"
     logging: *default_logging
