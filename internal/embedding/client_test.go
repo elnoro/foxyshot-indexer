@@ -3,10 +3,16 @@ package embedding
 import (
 	"github.com/matryer/is"
 	"log/slog"
+	"os"
 	"testing"
 )
 
 func TestClient_CreateEmbeddingForFile(t *testing.T) {
+	embeddingsURL := os.Getenv("EMBEDDINGS_URL")
+	if embeddingsURL == "" {
+		t.Skip("no embeddings url provided, skipping test")
+	}
+
 	tt := is.New(t)
 	cl := NewClient("http://embeddings:8000", slog.Default())
 

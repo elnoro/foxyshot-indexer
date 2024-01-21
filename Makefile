@@ -49,4 +49,4 @@ migrate/run: confirm
 
 publish/docker:
 	docker buildx build --push --platform linux/amd64,linux/arm64 -t ghcr.io/elnoro/indexer .
-.PHONY: check/dagger
+.PHONY: publish/docker

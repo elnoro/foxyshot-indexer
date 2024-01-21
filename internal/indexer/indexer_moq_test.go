@@ -424,3 +424,113 @@ func (mock *CaptionSmithMock) CaptionCalls() []struct {
 	mock.lockCaption.RUnlock()
 	return calls
 }
+
+// Ensure, that ImageEmbeddingClientMock does implement ImageEmbeddingClient.
+// If this is not the case, regenerate this file with moq.
+var _ ImageEmbeddingClient = &ImageEmbeddingClientMock{}
+
+// ImageEmbeddingClientMock is a mock implementation of ImageEmbeddingClient.
+//
+//	func TestSomethingThatUsesImageEmbeddingClient(t *testing.T) {
+//
+//		// make and configure a mocked ImageEmbeddingClient
+//		mockedImageEmbeddingClient := &ImageEmbeddingClientMock{
+//			CreateEmbeddingForFileFunc: func(filePath string) (domain.Embedding, error) {
+//				panic("mock out the CreateEmbeddingForFile method")
+//			},
+//			CreateEmbeddingFromBase64Func: func(data string) (domain.Embedding, error) {
+//				panic("mock out the CreateEmbeddingFromBase64 method")
+//			},
+//		}
+//
+//		// use mockedImageEmbeddingClient in code that requires ImageEmbeddingClient
+//		// and then make assertions.
+//
+//	}
+type ImageEmbeddingClientMock struct {
+	// CreateEmbeddingForFileFunc mocks the CreateEmbeddingForFile method.
+	CreateEmbeddingForFileFunc func(filePath string) (domain.Embedding, error)
+
+	// CreateEmbeddingFromBase64Func mocks the CreateEmbeddingFromBase64 method.
+	CreateEmbeddingFromBase64Func func(data string) (domain.Embedding, error)
+
+	// calls tracks calls to the methods.
+	calls struct {
+		// CreateEmbeddingForFile holds details about calls to the CreateEmbeddingForFile method.
+		CreateEmbeddingForFile []struct {
+			// FilePath is the filePath argument value.
+			FilePath string
+		}
+		// CreateEmbeddingFromBase64 holds details about calls to the CreateEmbeddingFromBase64 method.
+		CreateEmbeddingFromBase64 []struct {
+			// Data is the data argument value.
+			Data string
+		}
+	}
+	lockCreateEmbeddingForFile    sync.RWMutex
+	lockCreateEmbeddingFromBase64 sync.RWMutex
+}
+
+// CreateEmbeddingForFile calls CreateEmbeddingForFileFunc.
+func (mock *ImageEmbeddingClientMock) CreateEmbeddingForFile(filePath string) (domain.Embedding, error) {
+	if mock.CreateEmbeddingForFileFunc == nil {
+		panic("ImageEmbeddingClientMock.CreateEmbeddingForFileFunc: method is nil but ImageEmbeddingClient.CreateEmbeddingForFile was just called")
+	}
+	callInfo := struct {
+		FilePath string
+	}{
+		FilePath: filePath,
+	}
+	mock.lockCreateEmbeddingForFile.Lock()
+	mock.calls.CreateEmbeddingForFile = append(mock.calls.CreateEmbeddingForFile, callInfo)
+	mock.lockCreateEmbeddingForFile.Unlock()
+	return mock.CreateEmbeddingForFileFunc(filePath)
+}
+
+// CreateEmbeddingForFileCalls gets all the calls that were made to CreateEmbeddingForFile.
+// Check the length with:
+//
+//	len(mockedImageEmbeddingClient.CreateEmbeddingForFileCalls())
+func (mock *ImageEmbeddingClientMock) CreateEmbeddingForFileCalls() []struct {
+	FilePath string
+} {
+	var calls []struct {
+		FilePath string
+	}
+	mock.lockCreateEmbeddingForFile.RLock()
+	calls = mock.calls.CreateEmbeddingForFile
+	mock.lockCreateEmbeddingForFile.RUnlock()
+	return calls
+}
+
+// CreateEmbeddingFromBase64 calls CreateEmbeddingFromBase64Func.
+func (mock *ImageEmbeddingClientMock) CreateEmbeddingFromBase64(data string) (domain.Embedding, error) {
+	if mock.CreateEmbeddingFromBase64Func == nil {
+		panic("ImageEmbeddingClientMock.CreateEmbeddingFromBase64Func: method is nil but ImageEmbeddingClient.CreateEmbeddingFromBase64 was just called")
+	}
+	callInfo := struct {
+		Data string
+	}{
+		Data: data,
+	}
+	mock.lockCreateEmbeddingFromBase64.Lock()
+	mock.calls.CreateEmbeddingFromBase64 = append(mock.calls.CreateEmbeddingFromBase64, callInfo)
+	mock.lockCreateEmbeddingFromBase64.Unlock()
+	return mock.CreateEmbeddingFromBase64Func(data)
+}
+
+// CreateEmbeddingFromBase64Calls gets all the calls that were made to CreateEmbeddingFromBase64.
+// Check the length with:
+//
+//	len(mockedImageEmbeddingClient.CreateEmbeddingFromBase64Calls())
+func (mock *ImageEmbeddingClientMock) CreateEmbeddingFromBase64Calls() []struct {
+	Data string
+} {
+	var calls []struct {
+		Data string
+	}
+	mock.lockCreateEmbeddingFromBase64.RLock()
+	calls = mock.calls.CreateEmbeddingFromBase64
+	mock.lockCreateEmbeddingFromBase64.RUnlock()
+	return calls
+}

@@ -34,7 +34,7 @@ type Config struct {
 	DSN            string        `validate:"required"`
 	S3             S3Config      `validate:"required"`
 	Caption        Caption       `validate:"required"`
-	EmbeddingsURL  string        `validate:"required"`
+	EmbeddingsURL  string        ``
 }
 
 type S3Config struct {
@@ -74,7 +74,7 @@ func main() {
 	flag.DurationVar(&cfg.S3.RetryDuration, "s3.retry", 15*time.Second, "retry duration between attempts")
 
 	flag.StringVar(&cfg.Caption.OllamaURL, "caption.ollamaUrl", os.Getenv("OLLAMA_URL"), "url pointing to ollama API")
-	flag.StringVar(&cfg.EmbeddingsURL, "embeddings.url", "http://embeddings:8000", "url pointing to embeddings API")
+	flag.StringVar(&cfg.EmbeddingsURL, "embeddings.url", os.Getenv("EMBEDDINGS_URL"), "url pointing to embeddings API")
 
 	flag.Parse()
 
@@ -111,7 +111,7 @@ func main() {
 
 	captionSmith := buildCaptionSmith(cfg, logger)
 
-	embeddingsClient := embedding.NewClient(cfg.EmbeddingsURL, logger)
+	embeddingsClient := buildEmbeddingsClient(cfg, logger)
 
 	tracker := monitoring.NewTracker()
 	err = tracker.Register()
@@ -184,7 +184,8 @@ func validateConfig(cfg Config) error {
 
 func buildCaptionSmith(cfg Config, l *slog.Logger) indexer.CaptionSmith {
 	if cfg.Caption.OllamaURL == "" {
-		return captioning.NewDummy("")
+		l.Info("Caption service URL is not provided, running without captions...")
+		return captioning.NewPlaceholder("")
 	}
 
 	ollamaClient, err := ollama.NewClient(cfg.Caption.OllamaURL, l)
@@ -193,4 +194,14 @@ func buildCaptionSmith(cfg Config, l *slog.Logger) indexer.CaptionSmith {
 	}
 
 	return ollamaClient
+}
+
+func buildEmbeddingsClient(cfg Config, l *slog.Logger) indexer.ImageEmbeddingClient {
+	if cfg.EmbeddingsURL != "" {
+		return embedding.NewClient(cfg.EmbeddingsURL, l)
+	}
+
+	l.Info("Embeddings service URL is not provided, running without embeddings...")
+
+	return &embedding.NullClient{}
 }
