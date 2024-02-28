@@ -24,8 +24,8 @@ func NewImageRepo(db *sqlx.DB) *ImageRepo {
 }
 
 func (i *ImageRepo) Upsert(ctx context.Context, image domain.Image) error {
-	query := `INSERT INTO image_descriptions (file_id, description, last_modified) 
-			VALUES (:file_id, :description, :last_modified)
+	query := `INSERT INTO image_descriptions (file_id, description, last_modified, clip_embedding) 
+			VALUES (:file_id, :description, :last_modified, :clip_embedding)
 			ON CONFLICT (file_id) DO UPDATE SET (description, last_modified) 
 			    = (excluded.description, excluded.last_modified)`
 	_, err := i.db.NamedExecContext(ctx, query, image)
@@ -34,6 +34,30 @@ func (i *ImageRepo) Upsert(ctx context.Context, image domain.Image) error {
 	}
 
 	return nil
+}
+
+func (i *ImageRepo) FindByEmbedding(
+	ctx context.Context,
+	search domain.Embedding,
+	page,
+	perPage int,
+) ([]domain.Image, error) {
+	limit := perPage
+	offset := (page - 1) * perPage
+
+	images := make([]domain.Image, 0)
+
+	query := `SELECT file_id, description, last_modified
+		FROM image_descriptions
+		ORDER BY clip_embedding <-> $1 LIMIT $2 OFFSET $3`
+	args := []any{search, limit, offset}
+	err := i.db.SelectContext(ctx, &images, query, args...)
+	if err != nil {
+		return images, fmt.Errorf("searching for images with query %s, %w", query, err)
+	}
+
+	return images, nil
+
 }
 
 func (i *ImageRepo) FindByDescription(

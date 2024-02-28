@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/elnoro/foxyshot-indexer/internal/embedding"
 	"log/slog"
 	"os"
 	"time"
@@ -13,7 +14,7 @@ import (
 	"github.com/elnoro/foxyshot-indexer/internal/monitoring"
 )
 
-//go:generate moq -out indexer_moq_test.go . ImageRepo FileStorage OCR
+//go:generate moq -out indexer_moq_test.go . ImageRepo FileStorage OCR CaptionSmith ImageEmbeddingClient
 type ImageRepo interface {
 	Get(ctx context.Context, fileID string) (domain.Image, error)
 	GetLastModified(ctx context.Context) (time.Time, error)
@@ -29,10 +30,21 @@ type OCR interface {
 	Run(file string) (string, error)
 }
 
+type CaptionSmith interface {
+	Caption(filename string) (string, error)
+}
+
+type ImageEmbeddingClient interface {
+	CreateEmbeddingForFile(filePath string) (domain.Embedding, error)
+	CreateEmbeddingFromBase64(data string) (domain.Embedding, error)
+}
+
 type Indexer struct {
-	imageRepo ImageRepo
-	storage   FileStorage
-	ocrEngine OCR
+	imageRepo       ImageRepo
+	storage         FileStorage
+	ocrEngine       OCR
+	captionSmith    CaptionSmith
+	embeddingClient ImageEmbeddingClient
 
 	log     *slog.Logger
 	tracker *monitoring.Tracker
@@ -42,15 +54,19 @@ func NewIndexer(
 	imageRepo ImageRepo,
 	storage FileStorage,
 	ocrEngine OCR,
+	captionSmith CaptionSmith,
+	embeddingClient ImageEmbeddingClient,
 	log *slog.Logger,
 	tracker *monitoring.Tracker,
 ) *Indexer {
 	return &Indexer{
-		imageRepo: imageRepo,
-		storage:   storage,
-		ocrEngine: ocrEngine,
-		log:       log.WithGroup("INDEXER"),
-		tracker:   tracker,
+		imageRepo:       imageRepo,
+		storage:         storage,
+		ocrEngine:       ocrEngine,
+		captionSmith:    captionSmith,
+		embeddingClient: embeddingClient,
+		log:             log.WithGroup("INDEXER"),
+		tracker:         tracker,
 	}
 }
 
@@ -75,7 +91,7 @@ func (i *Indexer) IndexNewList(ctx context.Context, pattern string) error {
 			continue
 		}
 
-		err = i.Index(file)
+		err = i.Index(ctx, file)
 		if err != nil {
 			i.log.Error("indexing file", slog.String("err", err.Error()))
 		} else {
@@ -87,7 +103,7 @@ func (i *Indexer) IndexNewList(ctx context.Context, pattern string) error {
 	return nil
 }
 
-func (i *Indexer) Index(file domain.File) error {
+func (i *Indexer) Index(ctx context.Context, file domain.File) error {
 	f, err := i.storage.Download(file.Key)
 	if f != nil {
 		defer func(name string) {
@@ -103,21 +119,57 @@ func (i *Indexer) Index(file domain.File) error {
 	if err != nil {
 		return fmt.Errorf("cannot download file, %w", err)
 	}
-	desc, err := i.ocrEngine.Run(f.Name())
-	if err != nil {
-		return fmt.Errorf("running ocr, %w", err)
+
+	ocrStream := runOnFile(f.Name(), i.ocrEngine.Run)
+	captionStream := runOnFile(f.Name(), i.captionSmith.Caption)
+	vectorStream := runOnFile(f.Name(), i.embeddingClient.CreateEmbeddingForFile)
+
+	ocr := <-ocrStream
+	if ocr.err != nil {
+		return fmt.Errorf("running ocr, %w", ocr.err)
 	}
+	caption := <-captionStream
+	if caption.err != nil {
+		return fmt.Errorf("running captioning, %w", caption.err)
+	}
+
+	emb := <-vectorStream
+	if emb.err != nil && !errors.Is(emb.err, embedding.ErrEmbeddingsSwitchedOff) {
+		return fmt.Errorf("creating embedding, %w", emb.err)
+	}
+
+	desc := fmt.Sprintf("OCR:\n%s\nCaption:\n%s", ocr.val, caption.val)
 
 	img := domain.Image{
 		FileID:       file.Key,
 		LastModified: file.LastModified,
 		Description:  desc,
+		Embedding:    emb.val,
 	}
 
-	err = i.imageRepo.Upsert(context.TODO(), img)
+	err = i.imageRepo.Upsert(ctx, img)
 	if err != nil {
 		return fmt.Errorf("inserting image, %w", err)
 	}
 
 	return nil
+}
+
+type result[T any] struct {
+	val T
+	err error
+}
+
+type indexFunc[T any] func(filename string) (T, error)
+
+func runOnFile[T any](filename string, f indexFunc[T]) <-chan result[T] {
+	resStream := make(chan result[T])
+
+	go func(resStream chan<- result[T]) {
+		res, err := f(filename)
+
+		resStream <- result[T]{res, err}
+	}(resStream)
+
+	return resStream
 }

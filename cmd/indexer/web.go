@@ -5,6 +5,7 @@ import (
 	"errors"
 	"expvar"
 	"fmt"
+	"github.com/elnoro/foxyshot-indexer/internal/indexer"
 	"log"
 	"net/http"
 	"time"
@@ -20,6 +21,7 @@ import (
 //go:generate moq -out web_moq_test.go . imageRepo fileStorage
 type imageRepo interface {
 	FindByDescription(ctx context.Context, searchString string, page, perPage int) ([]domain.Image, error)
+	FindByEmbedding(ctx context.Context, embedding domain.Embedding, page, perPage int) ([]domain.Image, error)
 	Delete(ctx context.Context, fileID string) error
 }
 
@@ -32,6 +34,7 @@ type webApp struct {
 	log    *log.Logger
 
 	imageDescriptions imageRepo
+	embeddings        indexer.ImageEmbeddingClient
 	fileStorage       fileStorage
 
 	tracker *monitoring.Tracker
@@ -53,6 +56,7 @@ func (app *webApp) routes() http.Handler {
 
 	r.Route("/api", func(r chi.Router) {
 		r.Post("/search", app.searchHandler)
+		r.Post("/image-search", app.imageSearchHandler)
 		r.Delete("/delete", app.deleteHandler)
 	})
 

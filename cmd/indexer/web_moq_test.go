@@ -25,6 +25,9 @@ var _ imageRepo = &imageRepoMock{}
 //			FindByDescriptionFunc: func(ctx context.Context, searchString string, page int, perPage int) ([]domain.Image, error) {
 //				panic("mock out the FindByDescription method")
 //			},
+//			FindByEmbeddingFunc: func(ctx context.Context, embedding domain.Embedding, page int, perPage int) ([]domain.Image, error) {
+//				panic("mock out the FindByEmbedding method")
+//			},
 //		}
 //
 //		// use mockedimageRepo in code that requires imageRepo
@@ -37,6 +40,9 @@ type imageRepoMock struct {
 
 	// FindByDescriptionFunc mocks the FindByDescription method.
 	FindByDescriptionFunc func(ctx context.Context, searchString string, page int, perPage int) ([]domain.Image, error)
+
+	// FindByEmbeddingFunc mocks the FindByEmbedding method.
+	FindByEmbeddingFunc func(ctx context.Context, embedding domain.Embedding, page int, perPage int) ([]domain.Image, error)
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -58,9 +64,21 @@ type imageRepoMock struct {
 			// PerPage is the perPage argument value.
 			PerPage int
 		}
+		// FindByEmbedding holds details about calls to the FindByEmbedding method.
+		FindByEmbedding []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Embedding is the embedding argument value.
+			Embedding domain.Embedding
+			// Page is the page argument value.
+			Page int
+			// PerPage is the perPage argument value.
+			PerPage int
+		}
 	}
 	lockDelete            sync.RWMutex
 	lockFindByDescription sync.RWMutex
+	lockFindByEmbedding   sync.RWMutex
 }
 
 // Delete calls DeleteFunc.
@@ -140,6 +158,50 @@ func (mock *imageRepoMock) FindByDescriptionCalls() []struct {
 	mock.lockFindByDescription.RLock()
 	calls = mock.calls.FindByDescription
 	mock.lockFindByDescription.RUnlock()
+	return calls
+}
+
+// FindByEmbedding calls FindByEmbeddingFunc.
+func (mock *imageRepoMock) FindByEmbedding(ctx context.Context, embedding domain.Embedding, page int, perPage int) ([]domain.Image, error) {
+	if mock.FindByEmbeddingFunc == nil {
+		panic("imageRepoMock.FindByEmbeddingFunc: method is nil but imageRepo.FindByEmbedding was just called")
+	}
+	callInfo := struct {
+		Ctx       context.Context
+		Embedding domain.Embedding
+		Page      int
+		PerPage   int
+	}{
+		Ctx:       ctx,
+		Embedding: embedding,
+		Page:      page,
+		PerPage:   perPage,
+	}
+	mock.lockFindByEmbedding.Lock()
+	mock.calls.FindByEmbedding = append(mock.calls.FindByEmbedding, callInfo)
+	mock.lockFindByEmbedding.Unlock()
+	return mock.FindByEmbeddingFunc(ctx, embedding, page, perPage)
+}
+
+// FindByEmbeddingCalls gets all the calls that were made to FindByEmbedding.
+// Check the length with:
+//
+//	len(mockedimageRepo.FindByEmbeddingCalls())
+func (mock *imageRepoMock) FindByEmbeddingCalls() []struct {
+	Ctx       context.Context
+	Embedding domain.Embedding
+	Page      int
+	PerPage   int
+} {
+	var calls []struct {
+		Ctx       context.Context
+		Embedding domain.Embedding
+		Page      int
+		PerPage   int
+	}
+	mock.lockFindByEmbedding.RLock()
+	calls = mock.calls.FindByEmbedding
+	mock.lockFindByEmbedding.RUnlock()
 	return calls
 }
 

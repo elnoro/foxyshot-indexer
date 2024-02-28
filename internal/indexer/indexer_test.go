@@ -3,6 +3,7 @@ package indexer
 import (
 	"context"
 	"errors"
+	"github.com/elnoro/foxyshot-indexer/internal/embedding"
 	"log/slog"
 	"os"
 	"testing"
@@ -23,24 +24,33 @@ func TestIndexer_Index(t *testing.T) {
 	}
 	const testImg = "./testdata/expected-downloaded-image"
 	const testOCRResult = "expected-ocr-results"
+	const testCaptionResults = "expected-caption-results"
 
+	ctx := context.Background()
 	repo := &ImageRepoMock{UpsertFunc: func(ctx context.Context, image domain.Image) error { return nil }}
 	storage := &FileStorageMock{DownloadFunc: func(key string) (*os.File, error) { return os.Create(testImg) }}
 	ocr := &OCRMock{RunFunc: func(file string) (string, error) { return testOCRResult, nil }}
+	capSmith := &CaptionSmithMock{CaptionFunc: func(filename string) (string, error) { return testCaptionResults, nil }}
+	imgEmbClient := &ImageEmbeddingClientMock{
+		CreateEmbeddingForFileFunc: func(filePath string) (domain.Embedding, error) {
+			return domain.Embedding{}, nil
+		},
+	}
 	logger := slog.Default()
 	tracker := monitoring.NewTracker()
 
 	t.Run("successful run", func(t *testing.T) {
-		indexer := NewIndexer(repo, storage, ocr, logger, tracker)
-		err := indexer.Index(testFile)
+		indexer := NewIndexer(repo, storage, ocr, capSmith, imgEmbClient, logger, tracker)
+		err := indexer.Index(ctx, testFile)
 		tt.NoErr(err)
 
 		tt.Equal(storage.DownloadCalls()[0].Key, testFile.Key)
 		tt.Equal(ocr.RunCalls()[0].File, testImg)
 		tt.Equal(repo.UpsertCalls()[0].Image, domain.Image{
 			FileID:       testFile.Key,
-			Description:  testOCRResult,
+			Description:  "OCR:\n" + testOCRResult + "\nCaption:\n" + testCaptionResults,
 			LastModified: testFile.LastModified,
+			Embedding:    domain.Embedding{},
 		})
 
 		_, err = os.Stat(testImg)
@@ -53,8 +63,8 @@ func TestIndexer_Index(t *testing.T) {
 		expectedErr := errors.New("expected err")
 		repo := &ImageRepoMock{UpsertFunc: func(ctx context.Context, image domain.Image) error { return expectedErr }}
 
-		indexer := NewIndexer(repo, storage, ocr, logger, tracker)
-		err := indexer.Index(testFile)
+		indexer := NewIndexer(repo, storage, ocr, capSmith, imgEmbClient, logger, tracker)
+		err := indexer.Index(ctx, testFile)
 
 		tt.True(errors.Is(err, expectedErr))
 	})
@@ -63,8 +73,8 @@ func TestIndexer_Index(t *testing.T) {
 		expectedErr := errors.New("expected err")
 		storage := &FileStorageMock{DownloadFunc: func(key string) (*os.File, error) { return nil, expectedErr }}
 
-		indexer := NewIndexer(repo, storage, ocr, logger, tracker)
-		err := indexer.Index(testFile)
+		indexer := NewIndexer(repo, storage, ocr, capSmith, imgEmbClient, logger, tracker)
+		err := indexer.Index(ctx, testFile)
 
 		tt.True(errors.Is(err, expectedErr))
 	})
@@ -73,8 +83,8 @@ func TestIndexer_Index(t *testing.T) {
 		expectedErr := errors.New("expected err")
 		ocr := &OCRMock{RunFunc: func(file string) (string, error) { return "", expectedErr }}
 
-		indexer := NewIndexer(repo, storage, ocr, logger, tracker)
-		err := indexer.Index(testFile)
+		indexer := NewIndexer(repo, storage, ocr, capSmith, imgEmbClient, logger, tracker)
+		err := indexer.Index(ctx, testFile)
 
 		tt.True(errors.Is(err, expectedErr))
 	})
@@ -87,10 +97,19 @@ func TestIndexer_Index(t *testing.T) {
 			return f, nil
 		}}
 
-		indexer := NewIndexer(repo, storage, ocr, logger, tracker)
-		err := indexer.Index(testFile)
+		indexer := NewIndexer(repo, storage, ocr, capSmith, imgEmbClient, logger, tracker)
+		err := indexer.Index(ctx, testFile)
 
 		tt.NoErr(err)
+	})
+
+	t.Run("embeddings service not provided", func(t *testing.T) {
+		imgEmbClient := &embedding.NullClient{}
+
+		indexer := NewIndexer(repo, storage, ocr, capSmith, imgEmbClient, logger, tracker)
+		err := indexer.Index(ctx, testFile)
+
+		tt.NoErr(err) // no error must be returned if embeddings were switched off
 	})
 }
 
@@ -128,14 +147,20 @@ func TestIndexer_IndexNewList(t *testing.T) {
 		},
 	}
 	ocr := &OCRMock{RunFunc: func(file string) (string, error) { return testOCRResult, nil }}
+	capSmith := &CaptionSmithMock{CaptionFunc: func(filename string) (string, error) { return "", nil }}
+	imgEmbClient := &ImageEmbeddingClientMock{
+		CreateEmbeddingForFileFunc: func(filePath string) (domain.Embedding, error) {
+			return domain.Embedding{}, nil
+		},
+	}
 
 	t.Run("successful run", func(t *testing.T) {
-		indexer := NewIndexer(repo, storage, ocr, logger, tracker)
+		indexer := NewIndexer(repo, storage, ocr, capSmith, imgEmbClient, logger, tracker)
 		err := indexer.IndexNewList(ctx, "expected-pattern")
 
 		tt.NoErr(err)
-		tt.Equal(storage.ListFilesCalls()[0].Start, time.Unix(99, 0)) // must match GetLastModified result
-		tt.Equal(storage.ListFilesCalls()[0].Ext, "expected-pattern") // must match GetLastModified result
+		tt.Equal(storage.ListFilesCalls()[0].Start, time.Unix(99, 0)) // must match GetLastModified textResult
+		tt.Equal(storage.ListFilesCalls()[0].Ext, "expected-pattern") // must match GetLastModified textResult
 
 		tt.Equal(len(repo.UpsertCalls()), 1)                      // only one file passes the filter
 		tt.Equal(repo.UpsertCalls()[0].Image.FileID, expectedKey) // only one file passes the filter
@@ -144,7 +169,7 @@ func TestIndexer_IndexNewList(t *testing.T) {
 		repo := &ImageRepoMock{GetLastModifiedFunc: func(_ context.Context) (time.Time, error) {
 			return time.Time{}, expectedErr
 		}}
-		indexer := NewIndexer(repo, storage, ocr, logger, tracker)
+		indexer := NewIndexer(repo, storage, ocr, capSmith, imgEmbClient, logger, tracker)
 
 		err := indexer.IndexNewList(ctx, "expected-pattern")
 
@@ -157,7 +182,7 @@ func TestIndexer_IndexNewList(t *testing.T) {
 				return nil, expectedErr
 			},
 		}
-		indexer := NewIndexer(repo, storage, ocr, logger, tracker)
+		indexer := NewIndexer(repo, storage, ocr, capSmith, imgEmbClient, logger, tracker)
 
 		err := indexer.IndexNewList(ctx, "expected-pattern")
 
@@ -171,7 +196,7 @@ func TestIndexer_IndexNewList(t *testing.T) {
 				return []domain.File{{Key: expectedKey}, {Key: "invalid-key"}}, nil
 			},
 		}
-		indexer := NewIndexer(repo, storage, ocr, logger, tracker)
+		indexer := NewIndexer(repo, storage, ocr, capSmith, imgEmbClient, logger, tracker)
 
 		err := indexer.IndexNewList(ctx, "expected-pattern")
 
@@ -193,7 +218,7 @@ func TestIndexer_IndexNewList(t *testing.T) {
 			},
 			GetFunc: func(_ context.Context, fileID string) (domain.Image, error) { return domain.Image{}, nil },
 		}
-		indexer := NewIndexer(repo, storage, ocr, logger, tracker)
+		indexer := NewIndexer(repo, storage, ocr, capSmith, imgEmbClient, logger, tracker)
 
 		err := indexer.IndexNewList(ctx, "expected-pattern")
 

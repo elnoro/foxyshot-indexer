@@ -4,6 +4,9 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/elnoro/foxyshot-indexer/internal/captioning"
+	"github.com/elnoro/foxyshot-indexer/internal/captioning/ollama"
+	"github.com/elnoro/foxyshot-indexer/internal/embedding"
 	"log"
 	"log/slog"
 	"os"
@@ -30,6 +33,8 @@ type Config struct {
 	Ext            string        `validate:"required"`
 	DSN            string        `validate:"required"`
 	S3             S3Config      `validate:"required"`
+	Caption        Caption       `validate:"required"`
+	EmbeddingsURL  string        ``
 }
 
 type S3Config struct {
@@ -41,6 +46,10 @@ type S3Config struct {
 	Insecure      bool
 	RetryAttempts int
 	RetryDuration time.Duration
+}
+
+type Caption struct {
+	OllamaURL string
 }
 
 var version = "development"
@@ -63,6 +72,10 @@ func main() {
 
 	flag.IntVar(&cfg.S3.RetryAttempts, "s3.attempts", 0, "how many times to check s3 connectivity during startup")
 	flag.DurationVar(&cfg.S3.RetryDuration, "s3.retry", 15*time.Second, "retry duration between attempts")
+
+	flag.StringVar(&cfg.Caption.OllamaURL, "caption.ollamaUrl", os.Getenv("OLLAMA_URL"), "url pointing to ollama API")
+	flag.StringVar(&cfg.EmbeddingsURL, "embeddings.url", os.Getenv("EMBEDDINGS_URL"), "url pointing to embeddings API")
+
 	flag.Parse()
 
 	err := validateConfig(cfg)
@@ -96,6 +109,10 @@ func main() {
 		log.Fatal(err)
 	}
 
+	captionSmith := buildCaptionSmith(cfg, logger)
+
+	embeddingsClient := buildEmbeddingsClient(cfg, logger)
+
 	tracker := monitoring.NewTracker()
 	err = tracker.Register()
 	if err != nil {
@@ -115,7 +132,7 @@ func main() {
 
 	imgRepo := dbadapter.NewImageRepo(db)
 
-	idxr := indexer.NewIndexer(imgRepo, storage, ocrEngine, logger, tracker)
+	idxr := indexer.NewIndexer(imgRepo, storage, ocrEngine, captionSmith, embeddingsClient, logger, tracker)
 	runner := app.NewIndexRunner(idxr, cfg.Ext, cfg.ScrapeInterval, logger)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -127,6 +144,7 @@ func main() {
 		log:    log.Default(),
 
 		imageDescriptions: imgRepo,
+		embeddings:        embeddingsClient,
 		fileStorage:       storage,
 		tracker:           tracker,
 	}
@@ -162,4 +180,28 @@ func main() {
 func validateConfig(cfg Config) error {
 	validate := validator.New()
 	return validate.Struct(cfg)
+}
+
+func buildCaptionSmith(cfg Config, l *slog.Logger) indexer.CaptionSmith {
+	if cfg.Caption.OllamaURL == "" {
+		l.Info("Caption service URL is not provided, running without captions...")
+		return captioning.NewPlaceholder("")
+	}
+
+	ollamaClient, err := ollama.NewClient(cfg.Caption.OllamaURL, l)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return ollamaClient
+}
+
+func buildEmbeddingsClient(cfg Config, l *slog.Logger) indexer.ImageEmbeddingClient {
+	if cfg.EmbeddingsURL != "" {
+		return embedding.NewClient(cfg.EmbeddingsURL, l)
+	}
+
+	l.Info("Embeddings service URL is not provided, running without embeddings...")
+
+	return &embedding.NullClient{}
 }

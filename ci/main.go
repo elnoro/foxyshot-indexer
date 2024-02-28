@@ -77,8 +77,9 @@ func build(ctx context.Context) error {
 		WithExposedPort(9000)
 
 	const testDSN = "postgres://user:pass@db/db"
+	postgresContextDir := client.Host().Directory("./docker/postgres")
 	postgres := client.Container().
-		From("postgres:15").
+		Build(postgresContextDir).
 		WithEnvVariable("POSTGRES_PASSWORD", "pass").
 		WithEnvVariable("POSTGRES_USER", "user").
 		WithEnvVariable("POSTGRES_DB", "db").
